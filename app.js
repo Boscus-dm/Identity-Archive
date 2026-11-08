@@ -6,11 +6,14 @@
   var ANNOUNCER_STORAGE_KEY = "limbus-announcer-archive-v1";
   var STATUS_EFFECT_STORAGE_KEY = "limbus-status-effect-archive-v1";
   var CHARACTER_STORAGE_KEY = "limbus-character-manager-v1";
+  var COMBAT_STORAGE_KEY = "limbus-combat-manager-v1";
   var EGO_SCHEMA_VERSION = 3;
   var ANNOUNCER_SCHEMA_VERSION = 2;
   var STATUS_EFFECT_SCHEMA_VERSION = 1;
   var CHARACTER_SCHEMA_VERSION = 1;
   var STATUS_EFFECT_DEFAULT_SEED_VERSION = 3;
+  var COMBAT_ACCESS_SESSION_KEY = "limbus-combat-beta-unlocked";
+  var COMBAT_ACCESS_CODE_SHA256 = "3ffbd6eb3a8d0c8530edeb023f75e766150a81cc9607e575da5e4e7dcc0bb363";
   var STATE_VERSION = 6;
   var DEFAULT_THEME = "minimalist-dark";
   var DEFAULT_STATUS_EFFECTS = [
@@ -276,6 +279,7 @@
   var listElement = document.getElementById("identity-list");
   var detailElement = document.getElementById("detail-pane");
   var egoSkillFields = document.getElementById("ego-skill-fields");
+  var egoPassiveRequirements = document.getElementById("ego-passive-requirements");
   var egoListElement = document.getElementById("ego-list");
   var egoDetailElement = document.getElementById("ego-detail-pane");
   var announcerVoiceLineFields = document.getElementById("announcer-voice-line-fields");
@@ -297,6 +301,9 @@
   var statusEffectTooltipTimer = null;
   var statusEffectTooltipAnchor = null;
   var EGO_SINS = ["Wrath", "Lust", "Sloth", "Gluttony", "Gloom", "Pride", "Envy", "Angst", "Madness"];
+  var EGO_RISK_LEVELS = ["ZAYIN", "TETH", "HE", "WAW", "ALEPH"];
+  var COMBAT_SINS = EGO_SINS;
+  var COIN_TYPES = ["Normal", "Unbreakable", "Excision", "Concentration"];
   var ANNOUNCER_CATEGORIES = [
     "Equipping Announcer", "Rally", "Situational Rally", "Victory Cry", "Defeat Wail",
     "Enemy Staggered", "Ally Staggered", "Enemy Kill", "Ally Death", "Enemy Advantage",
@@ -312,6 +319,7 @@
   var announcerState = loadAnnouncerState();
   var statusEffectState = loadStatusEffectState();
   var characterState = loadCharacterState();
+  var combatState = loadCombatState();
   var KEYWORD_COLORS = [
     { text: "Clashable Counter", color: "#ff6000" },
     { text: "Heads Attack End", color: "#ff59c2" },
@@ -345,6 +353,96 @@
   function newId() {
     if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
     return "local-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+  }
+
+  function coinCountValue(value) {
+    var count = Number(value);
+    return Number.isInteger(count) && count > 0 && count <= 20 ? count : 0;
+  }
+
+  function normalizeCoinTypes(types, count) {
+    var normalized = Array.isArray(types) ? types.slice(0, count).map(function (coin) {
+      if (typeof coin === "string") {
+        return { type: COIN_TYPES.indexOf(coin) !== -1 ? coin : "Normal" };
+      }
+      coin = coin || {};
+      var type = COIN_TYPES.indexOf(coin.type) !== -1 ? coin.type :
+        (COIN_TYPES.indexOf(coin.coinType) !== -1 ? coin.coinType : "");
+      if (!type && COIN_TYPES.indexOf(coin.special) !== -1 && coin.special !== "Normal") type = coin.special;
+      return { type: type || "Normal" };
+    }) : [];
+    while (normalized.length < count) normalized.push({ type: "Normal" });
+    return normalized;
+  }
+
+  function renderCoinTypeFields(container, countValue, coinTypes) {
+    var count = coinCountValue(countValue);
+    container.textContent = "";
+    container.hidden = count === 0;
+    if (!count) return;
+    normalizeCoinTypes(coinTypes, count).forEach(function (coin, index) {
+      var label = document.createElement("label");
+      label.className = "coin-type-field";
+      var name = document.createElement("span");
+      name.textContent = "Coin " + (index + 1);
+      var typeSelect = document.createElement("select");
+      typeSelect.dataset.coinTypeIndex = String(index);
+      typeSelect.hidden = true;
+      COIN_TYPES.forEach(function (type) {
+        var option = document.createElement("option");
+        option.value = type;
+        option.textContent = type;
+        typeSelect.appendChild(option);
+      });
+      typeSelect.value = coin.type;
+      var typeMenu = document.createElement("details");
+      typeMenu.className = "rpg-menu coin-type-menu";
+      var typeSummary = document.createElement("summary");
+      typeSummary.textContent = coin.type + " Coin";
+      typeSummary.setAttribute("aria-label", "Coin " + (index + 1) + " type: " + coin.type);
+      var typeChoices = document.createElement("div");
+      typeChoices.className = "rpg-menu-options";
+      COIN_TYPES.forEach(function (type) {
+        var choice = document.createElement("button");
+        choice.type = "button";
+        choice.textContent = type + " Coin";
+        choice.setAttribute("aria-pressed", type === coin.type ? "true" : "false");
+        choice.addEventListener("click", function () {
+          typeSelect.value = type;
+          typeSummary.textContent = type + " Coin";
+          typeSummary.setAttribute("aria-label", "Coin " + (index + 1) + " type: " + type);
+          typeChoices.querySelectorAll("button").forEach(function (button) {
+            button.setAttribute("aria-pressed", button.textContent === type + " Coin" ? "true" : "false");
+          });
+          typeMenu.open = false;
+          typeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        typeChoices.appendChild(choice);
+      });
+      typeMenu.appendChild(typeSummary);
+      typeMenu.appendChild(typeChoices);
+      label.appendChild(name);
+      label.appendChild(typeSelect);
+      label.appendChild(typeMenu);
+      container.appendChild(label);
+    });
+  }
+
+  function readCoinTypeFields(container, countValue) {
+    var count = coinCountValue(countValue);
+    var coins = [];
+    for (var index = 0; index < count; index += 1) {
+      coins.push({
+        type: container.querySelector('[data-coin-type-index="' + index + '"]') ?
+          container.querySelector('[data-coin-type-index="' + index + '"]').value : "Normal"
+      });
+    }
+    return normalizeCoinTypes(coins, count);
+  }
+
+  function coinTypeLabel(coin) {
+    coin = normalizeCoinTypes([coin], 1)[0];
+    return coin.type + " Coin";
   }
 
   function normalizeTheme(theme) {
@@ -388,13 +486,30 @@
   }
 
   function resistanceValue(value) {
-    var text = String(value || "").trim();
-    if (/^n\/a$/i.test(text)) return "N/A";
-    if (/^ineffective$|^ineff\.?$/i.test(text)) return "Ineff.";
-    var match = ["Fatal", "Weak", "Normal", "Endure", "Ineff.", "Immune"].find(function (option) {
-      return option.toLocaleLowerCase() === text.toLocaleLowerCase();
-    });
-    return match || "";
+    var text = String(value === undefined || value === null ? "" : value).trim();
+    if (!text || /^n\/a$/i.test(text)) return "";
+    var legacyValues = { fatal: 1.51, weak: 1.01, normal: 1, endure: 0.99, "ineff.": 0.74, ineffective: 0.74, immune: 0 };
+    var legacyValue = legacyValues[text.toLocaleLowerCase()];
+    if (legacyValue !== undefined) return legacyValue;
+    var numeric = Number(text);
+    return Number.isFinite(numeric) && numeric >= 0 ? numeric : "";
+  }
+
+  function resistanceName(value) {
+    if (value === "" || value === null || value === undefined) return "—";
+    var multiplier = Number(value);
+    if (!Number.isFinite(multiplier) || multiplier < 0) return "—";
+    if (multiplier === 0) return "Immune";
+    if (multiplier < 0.75) return "Ineff.";
+    if (multiplier < 1) return "Endure";
+    if (multiplier === 1) return "Normal";
+    if (multiplier <= 1.5) return "Weak";
+    return "Fatal";
+  }
+
+  function resistanceDisplay(value) {
+    var name = resistanceName(value);
+    return name === "—" ? name : name + " (x" + value + ")";
   }
 
   function blankStats(stats) {
@@ -483,12 +598,16 @@
     migrated.skills = (Array.isArray(migrated.skills) ? migrated.skills : []).map(function (skill) {
       var updated = Object.assign({}, skill);
       updated.skillLevel = updated.skillLevel === undefined || updated.skillLevel === null ? "" : String(updated.skillLevel);
+      updated.amount = updated.amount === undefined || updated.amount === null || updated.amount === "" ? 1 : numberOrEmpty(updated.amount);
+      updated.flatDamage = numberOrEmpty(updated.flatDamage);
+      updated.coinTypes = normalizeCoinTypes(updated.coinTypes, coinCountValue(updated.coins));
+      delete updated.powerModifier;
       if (updated.type !== "Guard" && updated.type !== "Counter") delete updated.clashable;
       else updated.clashable = updated.clashable === true || String(updated.clashable).toLocaleLowerCase() === "true";
       return updated;
     });
     migrated.passives = (Array.isArray(migrated.passives) ? migrated.passives : []).map(migratePassive);
-    migrated.rarityVariant = Number(migrated.rarity) === 3 && migrated.rarityVariant === "Walpurgis" ? "Walpurgis" : "";
+    migrated.rarityVariant = [2, 3].indexOf(Number(migrated.rarity)) !== -1 && migrated.rarityVariant === "Walpurgis" ? "Walpurgis" : "";
     migrated.tags = Array.isArray(migrated.tags) ? migrated.tags :
       (Array.isArray(migrated.keywords) ? migrated.keywords :
         (typeof migrated.keywords === "string" ? migrated.keywords.split(",").map(function (tag) { return tag.trim(); }).filter(Boolean) : []));
@@ -512,6 +631,8 @@
     migrated.releaseDate = String(migrated.releaseDate || "");
     migrated.acquisition = String(migrated.acquisition || migrated.obtained || "");
     migrated.baseEgo = migrated.baseEgo === true || String(migrated.baseEgo).toLocaleLowerCase() === "true";
+    migrated.passiveAlwaysActive = migrated.passiveAlwaysActive === true ||
+      String(migrated.passiveAlwaysActive).toLocaleLowerCase() === "true";
     migrated.awakeningSanityCost = numberOrEmpty(migrated.awakeningSanityCost);
     migrated.corrosionSanityCost = numberOrEmpty(migrated.corrosionSanityCost);
     migrated.resourceCosts = Object.assign({}, migrated.resourceCosts || {});
@@ -519,8 +640,9 @@
     EGO_SINS.forEach(function (sin) {
       var cost = migrated.resourceCosts[sin];
       migrated.resourceCosts[sin] = numberOrEmpty(cost);
-      migrated.sinResistances[sin] = resistanceValue(migrated.sinResistances[sin]) ||
-        (sin === "Angst" || sin === "Madness" ? "Fatal" : "");
+      var storedResistance = migrated.sinResistances[sin];
+      migrated.sinResistances[sin] = storedResistance === "" || storedResistance === undefined || storedResistance === null ?
+        (sin === "Angst" || sin === "Madness" ? 1.51 : "") : resistanceValue(storedResistance);
     });
     migrated.awakeningQuote = String(migrated.awakeningQuote || "");
     migrated.corrosionQuote = String(migrated.corrosionQuote || "");
@@ -528,26 +650,36 @@
       skill = skill || {};
       var skillEffect = String(skill.effect || "").trim();
       var oldCoinEffects = String(skill.coinEffects || "").trim();
+      var skillThreadspin = Number(skill.threadspin);
       return {
-        mode: skill.mode === "N/A" ? "N/A" : (skill.mode === "Corrosion" ? "Corrosion" : "Awakening"),
-        threadspin: String(skill.threadspin || "4"),
+        mode: skill.mode === "Corrosion" ? "Corrosion" : "Awakening",
+        threadspin: String(Number.isInteger(skillThreadspin) && skillThreadspin >= 1 && skillThreadspin <= 4 ?
+          skillThreadspin : 4),
         name: String(skill.name || ""),
         sinAffinity: String(skill.sinAffinity || ""),
         attackType: String(skill.attackType || ""),
         basePower: String(skill.basePower === undefined || skill.basePower === null ? "" : skill.basePower),
         coinPower: String(skill.coinPower || ""),
         coinCount: numberOrEmpty(skill.coinCount),
+        coinTypes: normalizeCoinTypes(skill.coinTypes, coinCountValue(skill.coinCount)),
         attackWeight: numberOrEmpty(skill.attackWeight),
-        offenseModifier: String(skill.offenseModifier || ""),
+        amount: skill.amount === undefined || skill.amount === null || skill.amount === "" ? 1 : numberOrEmpty(skill.amount),
+        flatDamage: numberOrEmpty(skill.flatDamage),
         effect: [skillEffect, oldCoinEffects].filter(Boolean).join("\n\n")
       };
     }).filter(function (skill) {
-      return Boolean(skill.name || skill.effect || skill.basePower || skill.coinPower);
+      return Boolean(skill.name || skill.effect || skill.basePower || skill.coinPower ||
+        skill.amount !== 1 || Number(skill.flatDamage) > 0);
     });
+    migrated.skills.forEach(function (skill) { delete skill.offenseModifier; });
     migrated.passiveName = String(migrated.passiveName || "");
-    migrated.passiveThreadspin = String(migrated.passiveThreadspin || "");
+    var passiveThreadspin = Number(migrated.passiveThreadspin);
+    migrated.passiveThreadspin = Number.isInteger(passiveThreadspin) && passiveThreadspin >= 1 && passiveThreadspin <= 4 ?
+      String(passiveThreadspin) : "";
     migrated.passiveRequirement = String(migrated.passiveRequirement || "");
     migrated.passiveEffect = String(migrated.passiveEffect || "");
+    migrated.passiveRequirements = Array.isArray(migrated.passiveRequirements) ?
+      migratePassive({ requirements: migrated.passiveRequirements }).requirements : [];
     migrated.notes = String(migrated.notes || "");
     migrated.createdAt = String(migrated.createdAt || migrated.updatedAt || "");
     migrated.updatedAt = String(migrated.updatedAt || migrated.createdAt || "");
@@ -769,6 +901,15 @@
     migrated.relationships = String(migrated.relationships || "");
     migrated.trivia = String(migrated.trivia || "");
     migrated.notes = String(migrated.notes || "");
+    migrated.equippedEgoIds = Object.assign({}, migrated.equippedEgoIds || {});
+    migrated.equippedEgoThreadspins = Object.assign({}, migrated.equippedEgoThreadspins || {});
+    migrated.usedEgoPassiveIds = Array.isArray(migrated.usedEgoPassiveIds) ?
+      Array.from(new Set(migrated.usedEgoPassiveIds.map(String).filter(Boolean))) : [];
+    EGO_RISK_LEVELS.forEach(function (risk) {
+      var threadspin = Number(migrated.equippedEgoThreadspins[risk]);
+      migrated.equippedEgoThreadspins[risk] = Number.isInteger(threadspin) && threadspin >= 1 && threadspin <= 4 ?
+        threadspin : 4;
+    });
     migrated.createdAt = String(migrated.createdAt || migrated.updatedAt || "");
     migrated.updatedAt = String(migrated.updatedAt || migrated.createdAt || "");
     delete migrated.profile;
@@ -868,17 +1009,13 @@
   function loadState() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return { schemaVersion: STATE_VERSION, settings: { maxLevel: 40, theme: DEFAULT_THEME }, identities: [] };
+      if (!raw) return { schemaVersion: STATE_VERSION, settings: defaultSettings(), identities: [] };
       var parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.identities)) {
         var savedIdentities = parsed.identities.filter(function (identity) {
           return identity && typeof identity === "object" && identity.source !== "wiki";
         }).map(migrateIdentity);
-        var maxLevel = Number(parsed.settings && parsed.settings.maxLevel);
-        var settings = {
-          maxLevel: Number.isInteger(maxLevel) && maxLevel > 0 ? maxLevel : 40,
-          theme: normalizeTheme(parsed.settings && parsed.settings.theme)
-        };
+        var settings = normalizeSettings(parsed.settings);
         var migratedState = { schemaVersion: STATE_VERSION, settings: settings, identities: savedIdentities };
         if (JSON.stringify(migratedState) !== JSON.stringify(parsed)) {
           try {
@@ -892,7 +1029,22 @@
     } catch (error) {
       console.warn("Could not read the saved archive; loading an empty archive.", error);
     }
-    return { schemaVersion: STATE_VERSION, settings: { maxLevel: 40, theme: DEFAULT_THEME }, identities: [] };
+    return { schemaVersion: STATE_VERSION, settings: defaultSettings(), identities: [] };
+  }
+
+  function defaultSettings() {
+    return { maxLevel: 40, theme: DEFAULT_THEME, combatActivePassivesOnly: false, flatDamageMode: "per-skill" };
+  }
+
+  function normalizeSettings(settings) {
+    var normalized = defaultSettings();
+    settings = settings || {};
+    var maxLevel = Number(settings.maxLevel);
+    normalized.maxLevel = Number.isInteger(maxLevel) && maxLevel > 0 ? maxLevel : 40;
+    normalized.theme = normalizeTheme(settings.theme);
+    normalized.combatActivePassivesOnly = Boolean(settings.combatActivePassivesOnly);
+    normalized.flatDamageMode = settings.flatDamageMode === "per-die" ? "per-die" : "per-skill";
+    return normalized;
   }
 
   function saveState() {
@@ -1121,7 +1273,7 @@
     if (/^n\/a$/i.test(String(value || ""))) return "N/A";
     var rarity = Number(value);
     if (rarity < 1 || rarity > 3) return "Not set";
-    return "★".repeat(rarity) + (variant === "Walpurgis" && rarity === 3 ? " · Walpurgis" : "");
+    return "★".repeat(rarity) + (variant === "Walpurgis" && (rarity === 2 || rarity === 3) ? " · Walpurgis" : "");
   }
 
   function hpDisplay(identity, stats) {
@@ -1132,8 +1284,8 @@
     var growth = stats.hpGrowth === "" || stats.hpGrowth === undefined || stats.hpGrowth === null ? 0 : Number(stats.hpGrowth);
     if (!Number.isFinite(growth)) growth = 0;
     var level = Number(identity.level) || 40;
-    var calculatedHp = Math.ceil(baseHp + level * growth);
-    var formattedHp = String(calculatedHp);
+    var calculatedHp = baseHp + level * growth;
+    var formattedHp = String(Number.isInteger(calculatedHp) ? calculatedHp : Math.ceil(calculatedHp));
     return escapeHtml(formattedHp) + ' <span class="base-hp-value">(' + escapeHtml(stats.hp) + ")</span>";
   }
 
@@ -1197,7 +1349,9 @@
     var matches = state.identities.filter(function (identity) {
       return (!query || searchableText(identity).includes(query)) &&
         (!character || identity.characterId === character) &&
-        (!rarity || String(identity.rarity) === rarity);
+        (!rarity || (rarity.endsWith("-walpurgis") ?
+          String(identity.rarity) === rarity.charAt(0) && identity.rarityVariant === "Walpurgis" :
+          String(identity.rarity) === rarity));
     });
     if (sort === "rarity") matches.sort(function (a, b) {
       return (Number(b.rarity) || 0) - (Number(a.rarity) || 0) ||
@@ -1254,9 +1408,10 @@
       var detail = [skill.sin, skill.type, skill.skillLevel ? "Skill " + skill.skillLevel : "",
         skill.clashable ? "Clashable" : "",
         skill.skillPower ? "Power " + skill.skillPower : "", skill.coinPower ? "Coin " + skill.coinPower : "",
-        skill.coins ? skill.coins + " coins" : "", skill.amount ? "Amount " + skill.amount : "",
-        skill.attackWeight ? "Weight " + skill.attackWeight : "",
-        skill.powerModifier ? "Modifier " + skill.powerModifier : ""]
+        skill.coins ? skill.coins + " coins" : "", skill.amount ? "Pool weight " + skill.amount : "",
+        skill.coins && skill.coinTypes && skill.coinTypes.length ? normalizeCoinTypes(skill.coinTypes, coinCountValue(skill.coins)).map(coinTypeLabel).join(", ") : "",
+        Number(skill.flatDamage) > 0 ? "Flat damage +" + skill.flatDamage : "",
+        skill.attackWeight ? "Weight " + skill.attackWeight : ""]
         .filter(Boolean).join(" · ");
       return '<div class="skill-card"><div class="skill-card-heading"><strong>' +
         escapeHtml(skill.name || "Unnamed skill") + '</strong><span>' + escapeHtml(detail || "No skill values") +
@@ -1312,9 +1467,9 @@
       '<div><span>Stagger thresholds</span><strong>' + staggerContent + '</strong></div>' +
       '<div><span>Speed</span><strong>' + escapeHtml(stats.speed || "—") + '</strong></div>' +
       '<div><span>Defense mod</span><strong>' + escapeHtml(stats.defense || "—") + '</strong></div>' +
-      '<div><span>Slash</span><strong>' + escapeHtml(resistances.slash || "—") + '</strong></div>' +
-      '<div><span>Pierce</span><strong>' + escapeHtml(resistances.pierce || "—") + '</strong></div>' +
-      '<div><span>Blunt</span><strong>' + escapeHtml(resistances.blunt || "—") + '</strong></div>' +
+      '<div><span>Slash</span><strong>' + escapeHtml(resistanceDisplay(resistances.slash)) + '</strong></div>' +
+      '<div><span>Pierce</span><strong>' + escapeHtml(resistanceDisplay(resistances.pierce)) + '</strong></div>' +
+      '<div><span>Blunt</span><strong>' + escapeHtml(resistanceDisplay(resistances.blunt)) + '</strong></div>' +
       '</div></section>' +
       '<section class="detail-section"><div class="section-title-row"><h3>Skills</h3><span class="section-count">' +
       skills.length + '</span></div><div class="skill-list">' + skillContent + '</div></section>' +
@@ -1349,6 +1504,9 @@
     var skills = (ego.skills || []).map(function (skill) { return Object.values(skill).join(" "); }).join(" ");
     return [ego.name, characterName(ego.characterId), ego.riskLevel, ego.sinAffinity, ego.sourceAbnormality,
       ego.acquisition, ego.awakeningQuote, ego.corrosionQuote, ego.passiveName, ego.passiveRequirement,
+      (ego.passiveRequirements || []).map(function (requirement) {
+        return [requirement.sinType, requirement.sinAmount, requirement.sinMode].join(" ");
+      }).join(" "),
       ego.passiveEffect, ego.notes, costs, resistances, skills].join(" ").toLocaleLowerCase();
   }
 
@@ -1418,13 +1576,16 @@
           '<div><span>' + escapeHtml(sin) + '</span><strong>' + escapeHtml(cost) + '</strong></div>' : "";
     }).filter(Boolean).join("") || '<p class="quiet-copy">No E.G.O resource cost recorded.</p>';
     var resistanceContent = EGO_SINS.map(function (sin) {
-      return '<div><span>' + escapeHtml(sin) + '</span><strong>' + escapeHtml(ego.sinResistances && ego.sinResistances[sin] || "—") + '</strong></div>';
+      return '<div><span>' + escapeHtml(sin) + '</span><strong>' +
+        escapeHtml(resistanceDisplay(ego.sinResistances && ego.sinResistances[sin])) + '</strong></div>';
     }).join("");
     var skillContent = (ego.skills || []).length ? ego.skills.map(function (skill) {
       var skillDetails = [skill.sinAffinity, skill.attackType,
         skill.basePower ? "Base " + skill.basePower : "", skill.coinPower ? "Coin " + skill.coinPower : "",
-        skill.coinCount ? skill.coinCount + " coins" : "", skill.attackWeight ? "Weight " + skill.attackWeight : "",
-        skill.offenseModifier ? "Offense " + skill.offenseModifier : ""].filter(Boolean).join(" · ");
+        skill.coinCount ? skill.coinCount + " coins" : "", skill.amount ? "Pool weight " + skill.amount : "",
+        skill.coinCount && skill.coinTypes && skill.coinTypes.length ? normalizeCoinTypes(skill.coinTypes, coinCountValue(skill.coinCount)).map(coinTypeLabel).join(", ") : "",
+        Number(skill.flatDamage) > 0 ? "Flat damage +" + skill.flatDamage : "",
+        skill.attackWeight ? "Weight " + skill.attackWeight : ""].filter(Boolean).join(" · ");
       return '<div class="skill-card"><div class="skill-card-heading"><strong>' +
         escapeHtml((skill.mode || "Awakening") + " · Threadspin " + (skill.threadspin || "4") + (skill.name ? " · " + skill.name : "")) +
         '</strong><span>' + escapeHtml(skillDetails || "No skill values") + '</span></div>' +
@@ -1432,9 +1593,16 @@
     }).join("") : '<p class="quiet-copy">No skill tiers recorded yet.</p>';
     var awakeningQuote = ego.awakeningQuote ? renderMarkdown(ego.awakeningQuote) : '<span class="quiet-copy">No Awakening quote recorded.</span>';
     var corrosionQuote = ego.corrosionQuote ? renderMarkdown(ego.corrosionQuote) : '<span class="quiet-copy">No Corrosion quote recorded.</span>';
-    var passiveContent = ego.passiveName || ego.passiveRequirement || ego.passiveEffect ?
+    var passiveRequirements = (ego.passiveRequirements || []).map(function (requirement) {
+      return [requirement.sinAmount, requirement.sinType, requirement.sinMode].filter(function (value) {
+        return value !== undefined && value !== null && String(value).trim() !== "";
+      }).join(" ");
+    }).filter(Boolean).join(" + ");
+    var passiveContent = ego.passiveName || ego.passiveRequirement || ego.passiveEffect || passiveRequirements || ego.passiveAlwaysActive ?
       '<div class="passive-card"><div class="passive-card-heading"><strong>' + escapeHtml(ego.passiveName || "E.G.O Passive") +
-      '</strong><span>' + escapeHtml([ego.passiveThreadspin ? "Threadspin " + ego.passiveThreadspin : "", ego.passiveRequirement].filter(Boolean).join(" · ") || "No activation requirement") +
+      '</strong><span>' + escapeHtml([ego.passiveThreadspin ? "Threadspin " + ego.passiveThreadspin : "",
+        ego.passiveAlwaysActive ? "Always active" : "", ego.passiveRequirement, passiveRequirements]
+        .filter(Boolean).join(" · ") || "No activation requirement") +
       '</span></div>' + (ego.passiveEffect ? '<div class="markdown-content">' + renderMarkdown(ego.passiveEffect) + '</div>' : "") + "</div>" :
       '<p class="quiet-copy">No E.G.O Passive recorded.</p>';
     var notes = ego.notes ? renderMarkdown(ego.notes) : '<span class="quiet-copy">No notes recorded.</span>';
@@ -1739,6 +1907,12 @@
     var egoContent = egos.length ? '<div class="character-record-list">' + egos.map(function (ego) {
       return relatedRecord(ego, "ego");
     }).join("") + '</div>' : '<p class="quiet-copy">No E.G.O associated with this character.</p>';
+    var equippedEgos = EGO_RISK_LEVELS.map(function (risk) {
+      return egoById(character.equippedEgoIds && character.equippedEgoIds[risk]);
+    }).filter(function (ego) { return ego && ego.characterId === character.id; });
+    var equippedEgoContent = equippedEgos.length ? '<div class="character-record-list">' + equippedEgos.map(function (ego) {
+      return relatedRecord(ego, "ego");
+    }).join("") + '</div>' : '<p class="quiet-copy">No E.G.O equipped.</p>';
     var announcerContent = announcers.length ? '<div class="character-record-list">' + announcers.map(function (announcer) {
       return relatedRecord(announcer, "announcer");
     }).join("") + '</div>' : '<p class="quiet-copy">No announcers associated with this character.</p>';
@@ -1759,6 +1933,8 @@
       '</span></div>' + identityContent + '</section>' +
       '<section class="detail-section"><div class="section-title-row"><h3>E.G.O</h3><span class="section-count">' + egos.length +
       '</span></div>' + egoContent + '</section>' +
+      '<section class="detail-section"><div class="section-title-row"><h3>Equipped E.G.O</h3><span class="section-count">' + equippedEgos.length +
+      '</span></div>' + equippedEgoContent + '</section>' +
       '<section class="detail-section"><div class="section-title-row"><h3>Announcers</h3><span class="section-count">' + announcers.length +
       '</span></div>' + announcerContent + '</section>' +
       '<section class="detail-section"><div class="section-title-row"><h3>Unique status effects</h3><span class="section-count">' + uniqueEffects.length +
@@ -1786,6 +1962,16 @@
       if (skill && skill[key] !== undefined && skill[key] !== null) field.value = skill[key];
     });
     if (defaultMode) row.querySelector('[data-key="mode"]').value = defaultMode;
+    var coinCountField = row.querySelector('[data-key="coinCount"]');
+    var coinTypesContainer = row.querySelector("[data-coin-types]");
+    var updateCoinTypes = function () {
+      var currentTypes = coinTypesContainer.querySelector("[data-coin-type-index]") ?
+        readCoinTypeFields(coinTypesContainer, coinCountField.value) : (skill && skill.coinTypes);
+      renderCoinTypeFields(coinTypesContainer, coinCountField.value, currentTypes);
+    };
+    renderCoinTypeFields(coinTypesContainer, coinCountField.value, skill && skill.coinTypes);
+    coinCountField.addEventListener("input", updateCoinTypes);
+    coinCountField.addEventListener("change", updateCoinTypes);
     var updateLegend = function () {
       row.querySelector(".ego-skill-legend").textContent =
         row.querySelector('[data-key="mode"]').value + " · Threadspin " + row.querySelector('[data-key="threadspin"]').value;
@@ -1800,6 +1986,7 @@
   function openEgoForm(ego) {
     egoForm.reset();
     egoSkillFields.textContent = "";
+    egoPassiveRequirements.textContent = "";
     setupCharacterOptions();
     egoEditingId = ego ? ego.id : null;
     document.getElementById("ego-dialog-title").textContent = ego ? "Edit E.G.O" : "Add E.G.O";
@@ -1810,18 +1997,23 @@
         var field = egoForm.elements.namedItem(key);
         if (field) field.value = ego[key] === undefined || ego[key] === null ? "" : ego[key];
       });
+      (ego.passiveRequirements || []).forEach(function (requirement) {
+        addPassiveRequirement(egoPassiveRequirements, requirement);
+      });
       egoForm.elements.namedItem("character").value = ego.characterId || "";
       egoForm.elements.namedItem("baseEgo").checked = Boolean(ego.baseEgo);
+      egoForm.elements.namedItem("passiveAlwaysActive").checked = Boolean(ego.passiveAlwaysActive);
       egoForm.querySelectorAll("[data-resource-cost]").forEach(function (field) {
         field.value = ego.resourceCosts && ego.resourceCosts[field.dataset.resourceCost] !== undefined ? ego.resourceCosts[field.dataset.resourceCost] : "";
       });
       egoForm.querySelectorAll("[data-resistance]").forEach(function (field) {
-        field.value = ego.sinResistances && ego.sinResistances[field.dataset.resistance] || "";
+        var value = ego.sinResistances && ego.sinResistances[field.dataset.resistance];
+        field.value = value === undefined || value === null ? "" : value;
       });
       (ego.skills || []).forEach(function (skill) { addEgoSkillRow(skill); });
     } else {
       ["Angst", "Madness"].forEach(function (sin) {
-        egoForm.querySelector('[data-resistance="' + sin + '"]').value = "Fatal";
+        egoForm.querySelector('[data-resistance="' + sin + '"]').value = "1.51";
       });
     }
     egoDialog.showModal();
@@ -1892,6 +2084,53 @@
     if (character) ["name", "affiliation", "introduction", "personality", "history", "relationships", "trivia", "notes"].forEach(function (key) {
       characterForm.elements.namedItem(key).value = character[key] || "";
     });
+    var loadout = document.getElementById("character-ego-loadout");
+    loadout.textContent = "";
+    EGO_RISK_LEVELS.forEach(function (risk) {
+      var riskSlot = document.createElement("section");
+      riskSlot.className = "character-ego-slot";
+      var heading = document.createElement("strong");
+      heading.textContent = risk;
+      var egoLabel = document.createElement("label");
+      egoLabel.className = "field";
+      egoLabel.textContent = "Equipped E.G.O";
+      var select = document.createElement("select");
+      select.dataset.equippedEgoRisk = risk;
+      var emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = "None equipped";
+      select.appendChild(emptyOption);
+      egoState.egos.filter(function (ego) {
+        return character && ego.characterId === character.id && ego.riskLevel === risk;
+      }).sort(function (left, right) { return left.name.localeCompare(right.name); }).forEach(function (ego) {
+        var option = document.createElement("option");
+        option.value = ego.id;
+        option.textContent = ego.name;
+        select.appendChild(option);
+      });
+      if (character && character.equippedEgoIds) select.value = character.equippedEgoIds[risk] || "";
+      egoLabel.appendChild(select);
+      var threadspinLabel = document.createElement("label");
+      threadspinLabel.className = "field";
+      threadspinLabel.textContent = "Threadspin";
+      var threadspinSelect = document.createElement("select");
+      threadspinSelect.dataset.equippedEgoThreadspinRisk = risk;
+      [1, 2, 3, 4].forEach(function (value) {
+        var option = document.createElement("option");
+        option.value = String(value);
+        option.textContent = "Threadspin " + value;
+        threadspinSelect.appendChild(option);
+      });
+      threadspinSelect.value = character && character.equippedEgoThreadspins ?
+        String(character.equippedEgoThreadspins[risk] || 4) : "4";
+      threadspinSelect.disabled = !select.value;
+      select.addEventListener("change", function () { threadspinSelect.disabled = !select.value; });
+      threadspinLabel.appendChild(threadspinSelect);
+      riskSlot.appendChild(heading);
+      riskSlot.appendChild(egoLabel);
+      riskSlot.appendChild(threadspinLabel);
+      loadout.appendChild(riskSlot);
+    });
     characterDialog.showModal();
     characterForm.elements.namedItem("name").focus();
   }
@@ -1910,13 +2149,16 @@
     return Array.from(egoSkillFields.querySelectorAll(".ego-skill-row")).map(function (row) {
       var skill = {};
       row.querySelectorAll("[data-key]").forEach(function (field) { skill[field.dataset.key] = field.value.trim(); });
-      ["coinCount", "attackWeight"].forEach(function (key) {
+      skill.coinTypes = readCoinTypeFields(row.querySelector("[data-coin-types]"), skill.coinCount);
+      ["coinCount", "attackWeight", "amount", "flatDamage"].forEach(function (key) {
         if (skill[key] !== "") skill[key] = numberOrEmpty(skill[key]);
       });
+      delete skill.offenseModifier;
       return skill;
     }).filter(function (skill) {
       return Boolean(skill.name || skill.sinAffinity || skill.attackType || skill.basePower || skill.coinPower ||
-        skill.offenseModifier || skill.effect || skill.coinCount !== "" || skill.attackWeight !== "");
+        skill.effect || skill.coinCount !== "" || skill.attackWeight !== "" ||
+        (skill.amount !== "" && Number(skill.amount) !== 1) || Number(skill.flatDamage) > 0);
     });
   }
 
@@ -1930,6 +2172,16 @@
       if (field.type === "checkbox") field.checked = Boolean(skill && skill[key]);
       else if (skill && skill[key] !== undefined) field.value = skill[key];
     });
+    var coinCountField = row.querySelector('[data-key="coins"]');
+    var coinTypesContainer = row.querySelector("[data-coin-types]");
+    renderCoinTypeFields(coinTypesContainer, coinCountField.value, skill && skill.coinTypes);
+    function updateCoinTypes() {
+      var currentTypes = coinTypesContainer.querySelector("[data-coin-type-index]") ?
+        readCoinTypeFields(coinTypesContainer, coinCountField.value) : (skill && skill.coinTypes);
+      renderCoinTypeFields(coinTypesContainer, coinCountField.value, currentTypes);
+    }
+    coinCountField.addEventListener("input", updateCoinTypes);
+    coinCountField.addEventListener("change", updateCoinTypes);
     var typeField = row.querySelector('[data-key="type"]');
     var clashableControl = row.querySelector(".clashable-control");
     var updateClashableControl = function () {
@@ -2035,7 +2287,7 @@
     if (identity) {
       setField("name", identity.name);
       setField("character", identity.characterId);
-      setField("rarity", identity.rarityVariant === "Walpurgis" ? "3-walpurgis" : identity.rarity);
+      setField("rarity", identity.rarityVariant === "Walpurgis" ? identity.rarity + "-walpurgis" : identity.rarity);
       setField("mirrorWorld", identity.mirrorWorld);
       setField("prefix", identity.prefix);
       setField("panic", identity.panic);
@@ -2075,13 +2327,17 @@
       row.querySelectorAll("[data-key]").forEach(function (field) {
         skill[field.dataset.key] = field.type === "checkbox" ? field.checked : field.value.trim();
       });
-      ["coins", "amount", "attackWeight"].forEach(function (key) {
+      skill.coinTypes = readCoinTypeFields(row.querySelector("[data-coin-types]"), skill.coins);
+      ["coins", "amount", "attackWeight", "flatDamage"].forEach(function (key) {
         if (skill[key] !== "") skill[key] = numberOrEmpty(skill[key]);
       });
       if (skill.type !== "Guard" && skill.type !== "Counter") delete skill.clashable;
       return skill;
     }).filter(function (skill) {
       return Object.keys(skill).some(function (key) {
+        if (key === "coinTypes") return false;
+        if (key === "amount") return skill.amount !== "" && Number(skill.amount) !== 1;
+        if (key === "flatDamage") return Number(skill.flatDamage) > 0;
         return typeof skill[key] === "boolean" ? skill[key] : skill[key] !== "";
       });
     });
@@ -2093,21 +2349,25 @@
       row.querySelectorAll("[data-key]").forEach(function (field) {
         passive[field.dataset.key] = field.value.trim();
       });
-      passive.requirements = Array.from(row.querySelectorAll(".passive-requirement-row")).map(function (requirementRow) {
-        var requirement = {};
-        requirementRow.querySelectorAll("[data-requirement-key]").forEach(function (field) {
-          requirement[field.dataset.requirementKey] = field.value.trim();
-        });
-        if (requirement.sinAmount !== "") requirement.sinAmount = numberOrEmpty(requirement.sinAmount);
-        return requirement;
-      }).filter(function (requirement) {
-        return Object.values(requirement).some(function (value) {
-          return value !== undefined && value !== null && String(value).trim() !== "";
-        });
-      });
+      passive.requirements = readPassiveRequirements(row);
       return passive;
     }).filter(function (passive) {
       return Boolean(passive.name || passive.effect || passive.requirements.length);
+    });
+  }
+
+  function readPassiveRequirements(container) {
+    return Array.from(container.querySelectorAll(".passive-requirement-row")).map(function (requirementRow) {
+      var requirement = {};
+      requirementRow.querySelectorAll("[data-requirement-key]").forEach(function (field) {
+        requirement[field.dataset.requirementKey] = field.value.trim();
+      });
+      if (requirement.sinAmount !== "") requirement.sinAmount = numberOrEmpty(requirement.sinAmount);
+      return requirement;
+    }).filter(function (requirement) {
+      return Object.values(requirement).some(function (value) {
+        return value !== undefined && value !== null && String(value).trim() !== "";
+      });
     });
   }
 
@@ -2150,13 +2410,14 @@
     var previous = editingId ? byId(editingId) : null;
     var now = new Date().toISOString();
     var selectedRarity = String(data.get("rarity") || "");
+    var walpurgisRarity = selectedRarity.match(/^([23])-walpurgis$/);
     var record = Object.assign({}, previous || {}, {
       id: editingId || newId(),
       name: name,
       characterId: characterId,
       level: /^n\/a$/i.test(levelValue) ? "N/A" : numericLevel,
-      rarity: selectedRarity === "3-walpurgis" ? "3" : selectedRarity,
-      rarityVariant: selectedRarity === "3-walpurgis" ? "Walpurgis" : "",
+      rarity: walpurgisRarity ? walpurgisRarity[1] : selectedRarity,
+      rarityVariant: walpurgisRarity ? "Walpurgis" : "",
       mirrorWorld: String(data.get("mirrorWorld") || "").trim(),
       prefix: String(data.get("prefix") || "").trim(),
       panic: String(data.get("panic") || "").trim(),
@@ -2171,9 +2432,9 @@
         speed: String(data.get("speed") || "").trim(),
         defense: String(data.get("defense") || "").trim(),
         resistances: {
-          slash: String(data.get("slash") || "").trim(),
-          pierce: String(data.get("pierce") || "").trim(),
-          blunt: String(data.get("blunt") || "").trim()
+          slash: resistanceValue(data.get("slash")),
+          pierce: resistanceValue(data.get("pierce")),
+          blunt: resistanceValue(data.get("blunt"))
         }
       },
       skills: readSkills(),
@@ -2222,7 +2483,7 @@
     });
     var sinResistances = {};
     egoForm.querySelectorAll("[data-resistance]").forEach(function (field) {
-      sinResistances[field.dataset.resistance] = field.value;
+      sinResistances[field.dataset.resistance] = resistanceValue(field.value);
     });
     var record = migrateEgo(Object.assign({}, previous || {}, {
       id: egoEditingId || newId(),
@@ -2243,8 +2504,10 @@
       skills: readEgoSkills(),
       passiveName: String(data.get("passiveName") || "").trim(),
       passiveThreadspin: String(data.get("passiveThreadspin") || ""),
+      passiveAlwaysActive: egoForm.elements.namedItem("passiveAlwaysActive").checked,
       passiveRequirement: String(data.get("passiveRequirement") || "").trim(),
       passiveEffect: String(data.get("passiveEffect") || "").trim(),
+      passiveRequirements: readPassiveRequirements(egoPassiveRequirements),
       notes: String(data.get("notes") || "").trim(),
       createdAt: previous ? previous.createdAt : now,
       updatedAt: now
@@ -2350,6 +2613,16 @@
     }
     var previous = characterEditingId ? characterById(characterEditingId) : null;
     var now = new Date().toISOString();
+    var equippedEgoIds = {};
+    var equippedEgoThreadspins = {};
+    characterForm.querySelectorAll("[data-equipped-ego-risk]").forEach(function (field) {
+      if (field.value) equippedEgoIds[field.dataset.equippedEgoRisk] = field.value;
+    });
+    characterForm.querySelectorAll("[data-equipped-ego-threadspin-risk]").forEach(function (field) {
+      if (equippedEgoIds[field.dataset.equippedEgoThreadspinRisk]) {
+        equippedEgoThreadspins[field.dataset.equippedEgoThreadspinRisk] = Number(field.value) || 4;
+      }
+    });
     var record = migrateCharacter(Object.assign({}, previous || {}, {
       id: characterEditingId || newId(),
       name: name,
@@ -2360,6 +2633,8 @@
       relationships: String(data.get("relationships") || "").trim(),
       trivia: String(data.get("trivia") || "").trim(),
       notes: String(data.get("notes") || "").trim(),
+      equippedEgoIds: equippedEgoIds,
+      equippedEgoThreadspins: equippedEgoThreadspins,
       createdAt: previous ? previous.createdAt : now,
       updatedAt: now
     }));
@@ -2469,6 +2744,9 @@
   document.getElementById("close-dialog").addEventListener("click", function () { dialog.close(); });
   document.getElementById("cancel-dialog").addEventListener("click", function () { dialog.close(); });
   document.getElementById("ego-add-button").addEventListener("click", function () { openEgoForm(null); });
+  document.getElementById("add-ego-passive-requirement").addEventListener("click", function () {
+    addPassiveRequirement(egoPassiveRequirements, null);
+  });
   document.getElementById("announcer-add-button").addEventListener("click", function () { openAnnouncerForm(null); });
   document.getElementById("add-announcer-voice-line").addEventListener("click", function () { addAnnouncerVoiceLineRow(null); });
   document.getElementById("close-announcer-dialog").addEventListener("click", function () { announcerDialog.close(); });
@@ -2551,9 +2829,16 @@
     if (action.dataset.egoAction === "edit") openEgoForm(ego);
     if (action.dataset.egoAction === "delete" && confirm('Delete "' + ego.name + '" from the E.G.O archive?')) {
       egoState.egos = egoState.egos.filter(function (record) { return record.id !== ego.id; });
+      characterState.characters.forEach(function (character) {
+        Object.keys(character.equippedEgoIds || {}).forEach(function (risk) {
+          if (character.equippedEgoIds[risk] === ego.id) delete character.equippedEgoIds[risk];
+        });
+      });
       egoSelectedId = null;
       saveEgoState();
+      saveCharacterState();
       renderEgoArchive();
+      renderCharacterArchive();
     }
   });
   ["ego-search-input", "ego-character-filter", "ego-risk-filter", "ego-affinity-filter", "ego-sort-filter"].forEach(function (id) {
@@ -2576,7 +2861,1447 @@
     "rules-mechanics": document.getElementById("rules-mechanics-page"),
     "settings": document.getElementById("settings-page")
   };
-  var rulesSearchInput = document.getElementById("rules-search-input");
+  function freshCombatState() {
+    return {
+      round: 1,
+      combatants: [freshCombatant("Ally", "Group 1"), freshCombatant("Opponent", "Group 2")],
+      log: []
+    };
+  }
+  function freshCombatant(name, group) {
+    var ownedSins = {};
+    var roundSins = {};
+    COMBAT_SINS.forEach(function (sin) { ownedSins[sin] = 0; roundSins[sin] = 0; });
+    return {
+      id: newId(), source: "manual", name: name, group: group || "Group 1", identityId: "", skillKey: "", skillDataKey: "", sanity: 0,
+      basePower: 4, coinPower: 2, coinCount: 2,
+      coinTypes: [{ type: "Normal" }, { type: "Normal" }],
+      sin: "", skillType: "", rank: 1, die: 12, speedRange: "1-6", initiative: null, initiativeRound: 0,
+      egoId: "", egoMode: "", defensiveEgoId: "", currentHp: 100, maxHp: 100, shield: 0, staggerThresholds: "70 / 50 / 30",
+      staggeredThroughRound: 0, evadeRound: 0, evadePower: 0, counterReady: null, skillUsedRound: 0,
+      ownedSins: ownedSins, roundSins: roundSins, drawnSkillKeys: []
+    };
+  }
+  function parseSpeedRange(value) {
+    var text = String(value || "").trim().toLocaleLowerCase();
+    if (text === "high") return { min: 2, max: 8, fallback: false };
+    if (text === "mid" || text === "medium") return { min: 1, max: 6, fallback: false };
+    if (text === "low") return { min: 1, max: 3, fallback: false };
+    var match = text.match(/^(-?\d+)\s*(?:-|–|—|to)\s*(-?\d+)$/i);
+    if (match) {
+      var first = Number(match[1]);
+      var second = Number(match[2]);
+      return { min: Math.min(first, second), max: Math.max(first, second), fallback: false };
+    }
+    match = text.match(/^(-?\d+)$/);
+    if (match) return { min: Number(match[1]), max: Number(match[1]), fallback: false };
+    return { min: 1, max: 6, fallback: true };
+  }
+  function rollInitiative(combatant) {
+    var speed = parseSpeedRange(combatant.speedRange);
+    return Math.floor(Math.random() * (speed.max - speed.min + 1)) + speed.min;
+  }
+  function normalizeCombatState(saved) {
+    if (!saved || typeof saved !== "object" || !Array.isArray(saved.combatants) || !saved.combatants.length) {
+      return freshCombatState();
+    }
+    var combatants = saved.combatants.map(function (entry, index) {
+      var defaultGroup = index === 0 ? "Group 1" : "Group 2";
+      var combatant = Object.assign(freshCombatant("Combatant " + (index + 1), defaultGroup), entry || {});
+      combatant.id = String(combatant.id || newId());
+      combatant.source = combatant.source === "identity" ? "identity" : "manual";
+      combatant.name = String(combatant.name || "Combatant " + (index + 1));
+      combatant.skillKey = String(combatant.skillKey || "");
+      combatant.skillDataKey = String(combatant.skillDataKey || "");
+      combatant.egoId = String(combatant.egoId || "");
+      combatant.egoMode = combatant.egoMode === "Corrosion" ? "Corrosion" : "Awakening";
+      combatant.group = String(combatant.group || defaultGroup).trim().slice(0, 40) || defaultGroup;
+      combatant.speedRange = String(combatant.speedRange || "1-6").slice(0, 30);
+      combatant.initiative = combatant.initiative !== null && combatant.initiative !== "" &&
+        Number.isFinite(Number(combatant.initiative)) ? Math.floor(Number(combatant.initiative)) : null;
+      combatant.initiativeRound = Math.max(0, Math.floor(Number(combatant.initiativeRound) || 0));
+      combatant.defensiveEgoId = String(combatant.defensiveEgoId || "");
+      combatant.staggeredThroughRound = Math.max(0, Math.floor(Number(combatant.staggeredThroughRound) || 0));
+      combatant.evadeRound = Math.max(0, Math.floor(Number(combatant.evadeRound) || 0));
+      combatant.evadePower = Math.max(0, Number(combatant.evadePower) || 0);
+      combatant.counterReady = combatant.counterReady && typeof combatant.counterReady === "object" ?
+        combatant.counterReady : null;
+      combatant.counterReadyRound = combatant.counterReady ?
+        Math.max(0, Math.floor(Number(combatant.counterReadyRound) || 0)) : 0;
+      combatant.skillUsedRound = Math.max(0, Math.floor(Number(combatant.skillUsedRound) || 0));
+      var maxHp = Number(combatant.maxHp);
+      combatant.maxHp = Number.isFinite(maxHp) && maxHp > 0 ? Math.floor(maxHp) : 100;
+      var currentHp = Number(combatant.currentHp);
+      combatant.currentHp = Number.isFinite(currentHp) ? Math.min(combatant.maxHp, Math.max(0, Math.floor(currentHp))) : combatant.maxHp;
+      combatant.shield = Math.max(0, Math.floor(Number(combatant.shield) || 0));
+      var linkedIdentity = combatant.source === "identity" ? byId(combatant.identityId) : null;
+      if (linkedIdentity) {
+        var derivedHp = identityMaxHp(linkedIdentity);
+        if (derivedHp > 0) {
+          if (combatant.currentHp >= combatant.maxHp) combatant.currentHp = derivedHp;
+          combatant.maxHp = derivedHp;
+          combatant.currentHp = Math.min(combatant.currentHp, combatant.maxHp);
+        }
+        combatant.speedRange = String(blankStats(linkedIdentity.stats).speed || combatant.speedRange);
+      }
+      combatant.staggerThresholds = String(combatant.staggerThresholds || "").slice(0, 100);
+      combatant.drawnSkillKeys = Array.isArray(combatant.drawnSkillKeys) ?
+        combatant.drawnSkillKeys.map(String).slice(0, 2) : [];
+      combatant.coinTypes = normalizeCoinTypes(combatant.coinTypes, coinCountValue(combatant.coinCount));
+      ["ownedSins", "roundSins"].forEach(function (key) {
+        var counts = {};
+        COMBAT_SINS.forEach(function (sin) {
+          counts[sin] = Math.max(0, Math.floor(Number(combatant[key] && combatant[key][sin]) || 0));
+        });
+        combatant[key] = counts;
+      });
+      return combatant;
+    });
+    var log = Array.isArray(saved.log) ? saved.log.filter(function (entry) {
+      return entry && typeof entry === "object";
+    }).map(function (entry) {
+      return { round: Math.max(1, Math.floor(Number(entry.round) || 1)), message: String(entry.message || "").slice(0, 500) };
+    }).slice(-100) : [];
+    return {
+      round: Math.max(1, Math.floor(Number(saved.round) || 1)),
+      combatants: combatants,
+      log: log
+    };
+  }
+  function loadCombatState() {
+    try {
+      var raw = localStorage.getItem(COMBAT_STORAGE_KEY);
+      if (!raw) return freshCombatState();
+      return normalizeCombatState(JSON.parse(raw));
+    } catch (error) {
+      console.warn("Could not read the saved combat encounter; starting a new encounter.", error);
+      return freshCombatState();
+    }
+  }
+  function saveCombatState() {
+    try {
+      localStorage.setItem(COMBAT_STORAGE_KEY, JSON.stringify(combatState));
+      return true;
+    } catch (error) {
+      alert("The combat encounter could not be saved in this browser.");
+      return false;
+    }
+  }
+  function addCombatSelectOption(select, value, label) {
+    var option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  }
+  function equippedEgosForCharacter(characterId) {
+    var character = characterById(characterId);
+    if (!character) return [];
+    return EGO_RISK_LEVELS.map(function (risk) {
+      var ego = egoById(character.equippedEgoIds && character.equippedEgoIds[risk]);
+      return ego && ego.characterId === characterId && ego.riskLevel === risk ? ego : null;
+    }).filter(Boolean);
+  }
+  function equippedEgoThreadspin(characterId, egoId) {
+    var character = characterById(characterId);
+    if (!character) return 4;
+    var ego = egoById(egoId);
+    if (!ego) return 4;
+    var risk = ego.riskLevel;
+    var value = Number(character.equippedEgoThreadspins && character.equippedEgoThreadspins[risk]);
+    return Number.isInteger(value) && value >= 1 && value <= 4 ? value : 4;
+  }
+  function availableCombatSkills(identity) {
+    if (!identity) return [];
+    var skills = (identity.skills || []).map(function (skill, index) {
+      return {
+        key: "identity:" + index, name: skill.name || "Skill " + (index + 1), sin: skill.sin || "",
+        basePower: skill.skillPower, coinPower: skill.coinPower, coinCount: skill.coins,
+        coinTypes: skill.coinTypes, rank: skill.skillLevel, amount: skill.amount, flatDamage: skill.flatDamage,
+        type: skill.type || "", clashable: Boolean(skill.clashable), attackWeight: skill.attackWeight
+      };
+    });
+    equippedEgosForCharacter(identity.characterId).forEach(function (ego) {
+      var equippedThreadspin = equippedEgoThreadspin(identity.characterId, ego.id);
+      (ego.skills || []).forEach(function (skill, index) {
+        var requiredThreadspin = Number(skill.threadspin) || 4;
+        if (requiredThreadspin > equippedThreadspin) return;
+        skills.push({
+          key: "ego:" + ego.id + ":" + index,
+          name: ego.name + " · " + (skill.mode || "Awakening") + " · " + (skill.name || "Threadspin " + (skill.threadspin || "4")),
+          sin: skill.sinAffinity || ego.sinAffinity || "", basePower: skill.basePower, coinPower: skill.coinPower, coinCount: skill.coinCount,
+          coinTypes: skill.coinTypes, rank: "1", ego: ego.name, egoId: ego.id,
+          egoMode: skill.mode || "Awakening", threadspin: requiredThreadspin,
+          egoSanityCost: skill.mode === "Corrosion" ? ego.corrosionSanityCost : ego.awakeningSanityCost,
+          resourceCosts: ego.resourceCosts,
+          type: skill.attackType || "", amount: skill.amount, flatDamage: skill.flatDamage,
+          attackWeight: skill.attackWeight
+        });
+      });
+    });
+    return skills;
+  }
+  function availableIdentityCombatSkills(identity) {
+    return availableCombatSkills(identity).filter(function (skill) { return !skill.egoId; });
+  }
+  function availableEgoCombatSkills(identity, egoId) {
+    return availableCombatSkills(identity).filter(function (skill) { return skill.egoId === egoId; });
+  }
+  function selectedEgoCombatSkill(identity, egoId, mode) {
+    return availableEgoCombatSkills(identity, egoId).filter(function (skill) {
+      return skill.egoMode === mode;
+    }).sort(function (left, right) { return right.threadspin - left.threadspin; })[0] || null;
+  }
+  function combatSkillPoolWeight(skill) {
+    if (skill.amount === "" || skill.amount === null || skill.amount === undefined) return 1;
+    var weight = Number(skill.amount);
+    return Number.isFinite(weight) && weight > 0 ? weight : 0;
+  }
+  function drawCombatSkills(identity, excludedKeys, count) {
+    var excluded = new Set(excludedKeys || []);
+    var pool = availableIdentityCombatSkills(identity).map(function (skill) {
+      return { skill: skill, weight: combatSkillPoolWeight(skill) };
+    }).filter(function (entry) {
+      return entry.weight > 0 && !excluded.has(entry.skill.key);
+    });
+    var drawn = [];
+    var drawLimit = Math.max(0, Math.min(2, Number(count) || 0));
+    while (pool.length && drawn.length < drawLimit) {
+      var totalWeight = pool.reduce(function (total, entry) { return total + entry.weight; }, 0);
+      var roll = Math.random() * totalWeight;
+      var selectedIndex = pool.findIndex(function (entry) {
+        roll -= entry.weight;
+        return roll < 0;
+      });
+      if (selectedIndex < 0) selectedIndex = pool.length - 1;
+      drawn.push(pool.splice(selectedIndex, 1)[0].skill);
+    }
+    return drawn;
+  }
+  function combatantHasUsedSkillThisRound(combatant) {
+    return combatant.skillUsedRound === combatState.round;
+  }
+  function combatantCanUseSkill(combatant, skill) {
+    if (!skill || combatantHasUsedSkillThisRound(combatant)) return false;
+    return combatant.source !== "identity" || Boolean(skill.egoId) || combatant.drawnSkillKeys.includes(skill.key);
+  }
+  function consumeCombatantSkill(combatant, skill) {
+    combatant.skillUsedRound = combatState.round;
+    if (combatant.source !== "identity") return;
+    if (skill.egoId) return;
+    combatant.drawnSkillKeys = combatant.drawnSkillKeys.filter(function (key) { return key !== skill.key; });
+    combatant.skillKey = combatant.drawnSkillKeys[0] || "";
+  }
+  function passiveRequirementText(passive) {
+    var requirements = Array.isArray(passive.requirements) ? passive.requirements : [];
+    var structured = requirements.map(function (requirement) {
+      return [requirement.sinAmount, requirement.sinType, requirement.sinMode].filter(function (value) {
+        return value !== undefined && value !== null && String(value).trim() !== "";
+      }).join(" ");
+    }).filter(Boolean).join(" + ");
+    return structured || String(passive.requirementText || passive.passiveRequirement || "").trim() ||
+      "No activation requirement recorded";
+  }
+  function combatPassivesFor(combatant) {
+    var identity = byId(combatant.identityId);
+    if (!identity) return [];
+    var passives = (identity.passives || []).map(function (passive) {
+      return { passive: passive, source: identity.name };
+    });
+    var character = characterById(identity.characterId);
+    var activatedEgoIds = character ? character.usedEgoPassiveIds || [] : [];
+    egoState.egos.filter(function (ego) {
+      return ego.characterId === identity.characterId;
+    }).forEach(function (ego) {
+      var isEquipped = equippedEgosForCharacter(identity.characterId).some(function (equipped) {
+        return equipped.id === ego.id;
+      });
+      var permanentlyActive = activatedEgoIds.includes(ego.id);
+      if (!isEquipped && !permanentlyActive && !ego.passiveAlwaysActive) return;
+      var threadspin = isEquipped ? equippedEgoThreadspin(identity.characterId, ego.id) : 0;
+      var passiveUnlock = Number(ego.passiveThreadspin);
+      if (!Number.isInteger(passiveUnlock) || passiveUnlock < 1 || passiveUnlock > 4) passiveUnlock = 1;
+      if ((threadspin >= passiveUnlock || permanentlyActive || ego.passiveAlwaysActive) &&
+        (ego.passiveName || ego.passiveRequirement || ego.passiveEffect || ego.passiveAlwaysActive ||
+          (ego.passiveRequirements || []).length)) {
+        passives.push({
+          passive: {
+            name: ego.passiveName || ego.name + " Passive",
+            requirements: ego.passiveRequirements,
+            requirementText: ego.passiveRequirement,
+            effect: ego.passiveEffect,
+            permanentlyActive: permanentlyActive,
+            alwaysActive: Boolean(ego.passiveAlwaysActive)
+          },
+          source: ego.name
+        });
+      }
+    });
+    return passives;
+  }
+  function combatantCard(id) {
+    return document.querySelector('.combatant-card[data-combatant-id="' + id + '"]');
+  }
+  function syncCombatantFromCard(combatant, card) {
+    if (!card) return;
+    function field(name) { return card.querySelector('[data-field="' + name + '"]'); }
+    combatant.source = field("source").value;
+    combatant.identityId = field("identity").value;
+    var linkedIdentity = combatant.source === "identity" ? byId(combatant.identityId) : null;
+    combatant.name = linkedIdentity ? linkedIdentity.name : (field("name").value.trim() || "Combatant");
+    combatant.group = String(field("group").value || "").trim().slice(0, 40) || "Group 1";
+    combatant.speedRange = linkedIdentity ? String(blankStats(linkedIdentity.stats).speed || "1-6") :
+      String(field("speedRange").value || "1-6");
+    combatant.skillKey = field("skill").value;
+    combatant.egoId = field("ego").value;
+    combatant.egoMode = field("egoMode").value;
+    combatant.defensiveEgoId = field("defensiveEgo").value;
+    combatant.sanity = Number(field("sanity").value);
+    combatant.currentHp = Math.max(0, Math.floor(Number(field("currentHp").value) || 0));
+    combatant.maxHp = Math.max(1, Math.floor(Number(field("maxHp").value) || 1));
+    combatant.currentHp = Math.min(combatant.maxHp, combatant.currentHp);
+    combatant.staggerThresholds = field("staggerThresholds").value;
+    combatant.basePower = field("basePower").value;
+    combatant.coinPower = field("coinPower").value;
+    combatant.coinCount = field("coinCount").value;
+    combatant.coinTypes = readCoinTypeFields(card.querySelector('[data-view="combat-coin-types"]'), combatant.coinCount);
+    combatant.skillType = field("skillType").value;
+    combatant.flatDamage = field("flatDamage").value;
+    combatant.sin = field("sin").value;
+    combatant.rank = field("rank").value;
+    combatant.die = field("die").value;
+    combatant.targetId = field("target").value;
+  }
+  function selectedCombatSkill(combatant, card) {
+    function field(name) { return card.querySelector('[data-field="' + name + '"]'); }
+    var identity = combatant.source === "identity" ? byId(combatant.identityId) : null;
+    var archivedSkill = identity && (combatant.egoId ?
+      selectedEgoCombatSkill(identity, combatant.egoId, combatant.egoMode) :
+      availableIdentityCombatSkills(identity).find(function (skill) { return skill.key === combatant.skillKey; }));
+    if (combatant.source === "identity" && !archivedSkill) return null;
+    var basePower = Number(field("basePower").value);
+    var coinPower = Number(field("coinPower").value);
+    var coinCount = Number(field("coinCount").value);
+    var rank = Number(field("rank").value);
+    var die = Number(field("die").value);
+    var flatDamage = Number(field("flatDamage").value || 0);
+    return {
+      key: archivedSkill ? archivedSkill.key : "",
+      name: archivedSkill ? archivedSkill.name : "Manual skill",
+      sin: archivedSkill ? archivedSkill.sin : field("sin").value,
+      type: archivedSkill ? archivedSkill.type : field("skillType").value,
+      clashable: Boolean(archivedSkill && archivedSkill.clashable),
+      attackWeight: archivedSkill ? archivedSkill.attackWeight : "",
+      egoId: archivedSkill ? archivedSkill.egoId : "",
+      ego: archivedSkill && archivedSkill.ego ? {
+        id: archivedSkill.egoId,
+        name: archivedSkill.ego,
+        mode: archivedSkill.egoMode,
+        sanityCost: archivedSkill.egoSanityCost,
+        resourceCosts: archivedSkill.resourceCosts || {}
+      } : null,
+      coinTypes: readCoinTypeFields(card.querySelector('[data-view="combat-coin-types"]'), coinCount),
+      valid: field("basePower").value !== "" && field("coinCount").value !== "" &&
+        Number.isFinite(basePower) && basePower >= 0 && Number.isFinite(coinPower) &&
+        Number.isFinite(flatDamage) && flatDamage >= 0 &&
+        Number.isInteger(coinCount) && coinCount >= 0 && coinCount <= 20 &&
+        Number.isInteger(rank) && rank >= 1 && rank <= 3 &&
+        [4, 6, 8, 10, 12, 20].indexOf(die) !== -1,
+      basePower: basePower,
+      coinPower: coinPower,
+      coinCount: coinCount,
+      rank: rank,
+      die: die,
+      flatDamage: flatDamage
+    };
+  }
+  function parseCombatValue(value) {
+    var match = String(value === undefined || value === null ? "" : value).replace(/\s/g, "").match(/^[+-]?\d+(?:\.\d+)?$/);
+    return match ? Number(match[0]) : "";
+  }
+  function applyArchivedCombatSkill(combatant, card) {
+    var identity = byId(combatant.identityId);
+    var skill = identity && (combatant.egoId ?
+      selectedEgoCombatSkill(identity, combatant.egoId, combatant.egoMode) :
+      availableIdentityCombatSkills(identity).find(function (entry) { return entry.key === combatant.skillKey; }));
+    if (!skill) return;
+    combatant.name = identity.name;
+    combatant.skillDataKey = skill.key;
+    combatant.basePower = parseCombatValue(skill.basePower);
+    combatant.coinPower = parseCombatValue(skill.coinPower);
+    combatant.coinCount = parseCombatValue(skill.coinCount);
+    combatant.coinTypes = normalizeCoinTypes(skill.coinTypes, coinCountValue(skill.coinCount));
+    combatant.sin = skill.sin || "";
+    combatant.skillType = skill.type || "";
+    combatant.flatDamage = parseCombatValue(skill.flatDamage);
+    var rank = String(skill.rank || "").match(/[123]/);
+    if (rank) combatant.rank = Number(rank[0]);
+    var fields = ["name", "basePower", "coinPower", "coinCount", "sin", "skillType", "rank", "flatDamage"];
+    fields.forEach(function (name) {
+      var field = card.querySelector('[data-field="' + name + '"]');
+      field.value = combatant[name];
+    });
+    renderCoinTypeFields(card.querySelector('[data-view="combat-coin-types"]'), combatant.coinCount, combatant.coinTypes);
+  }
+  function appendCombatLog(message) {
+    combatState.log.push({ round: combatState.round, message: message });
+    if (combatState.log.length > 100) combatState.log.shift();
+  }
+  function identityMaxHp(identity) {
+    var stats = blankStats(identity.stats);
+    if (stats.hp === "" || stats.hp === undefined || stats.hp === null ||
+      /^n\/a$/i.test(String(stats.hp)) || /^n\/a$/i.test(String(stats.hpGrowth)) ||
+      /^n\/a$/i.test(String(identity.level))) return 0;
+    var baseHp = Number(stats.hp);
+    if (!Number.isFinite(baseHp)) return 0;
+    var growth = stats.hpGrowth === "" || stats.hpGrowth === undefined || stats.hpGrowth === null ? 0 : Number(stats.hpGrowth);
+    var level = Number(identity.level) || 40;
+    if (!Number.isFinite(growth)) growth = 0;
+    return Math.ceil(baseHp + growth * level);
+  }
+  function identityCombatVitals(combatant) {
+    synchronizeIdentityVitals(combatant, true);
+  }
+  function synchronizeIdentityVitals(combatant, restoreFullHealth) {
+    var identity = byId(combatant.identityId);
+    if (!identity) return false;
+    var stats = blankStats(identity.stats);
+    var maxHp = identityMaxHp(identity);
+    var changed = false;
+    if (Number.isFinite(maxHp) && maxHp > 0) {
+      var previousMax = Number(combatant.maxHp) || maxHp;
+      var currentHp = Number(combatant.currentHp);
+      var nextMax = Math.floor(maxHp);
+      if (combatant.maxHp !== nextMax) {
+        combatant.currentHp = restoreFullHealth || currentHp >= previousMax ?
+          nextMax : Math.min(Math.max(0, Math.floor(currentHp) || 0), nextMax);
+        combatant.maxHp = nextMax;
+        changed = true;
+      } else if (restoreFullHealth && combatant.currentHp !== nextMax) {
+        combatant.currentHp = nextMax;
+        changed = true;
+      }
+    }
+    var speedRange = String(stats.speed || "1-6");
+    if (combatant.speedRange !== speedRange) {
+      combatant.speedRange = speedRange;
+      changed = true;
+    }
+    var thresholds = stats.staggerThresholds.filter(function (threshold) {
+      var number = Number(threshold);
+      return Number.isFinite(number) && number >= 0 && number <= 100;
+    }).join(" / ");
+    if (combatant.staggerThresholds !== thresholds) {
+      combatant.staggerThresholds = thresholds;
+      changed = true;
+    }
+    return changed;
+  }
+  function combatStaggerThresholds(combatant) {
+    return String(combatant.staggerThresholds || "").split(/[\/,]/).map(function (value) {
+      return Number(String(value).trim().replace(/%$/, ""));
+    }).filter(function (value) {
+      return Number.isFinite(value) && value >= 0 && value <= 100;
+    }).sort(function (left, right) { return right - left; });
+  }
+  function renderCombatantVitals(combatant, card) {
+    var currentHp = Math.max(0, Number(combatant.currentHp) || 0);
+    var maxHp = Math.max(1, Number(combatant.maxHp) || 1);
+    var percentage = Math.min(100, currentHp / maxHp * 100);
+    var track = card.querySelector(".combat-hp-track");
+    var fill = card.querySelector('[data-view="hp-fill"]');
+    var markers = card.querySelector('[data-view="stagger-markers"]');
+    var thresholds = combatStaggerThresholds(combatant);
+    var stage = thresholds.filter(function (threshold) { return percentage <= threshold; }).length;
+    fill.style.width = percentage + "%";
+    fill.classList.toggle("is-low", percentage <= 25);
+    track.setAttribute("aria-valuemax", String(maxHp));
+    track.setAttribute("aria-valuenow", String(currentHp));
+    markers.textContent = "";
+    thresholds.forEach(function (threshold) {
+      var marker = document.createElement("span");
+      marker.className = "combat-stagger-marker";
+      marker.style.left = threshold + "%";
+      marker.setAttribute("aria-hidden", "true");
+      markers.appendChild(marker);
+    });
+    card.querySelector('[data-view="stagger-level"]').textContent = thresholds.length ?
+      (stage ? "Staggered · " + stage + " threshold" + (stage === 1 ? "" : "s") : "Not staggered") : "No stagger thresholds";
+    card.classList.toggle("is-staggered", stage > 0);
+  }
+  function recordSinUse(combatant, skill) {
+    if (!COMBAT_SINS.includes(skill.sin)) return;
+    combatant.ownedSins[skill.sin] = (Number(combatant.ownedSins[skill.sin]) || 0) + 1;
+    combatant.roundSins[skill.sin] = (Number(combatant.roundSins[skill.sin]) || 0) + 1;
+  }
+  function egoCostFailure(combatant, skill) {
+    if (!skill.ego) return "";
+    var missing = EGO_SINS.filter(function (sin) {
+      var cost = Number(skill.ego.resourceCosts[sin]) || 0;
+      return cost > (Number(combatant.ownedSins[sin]) || 0);
+    });
+    if (missing.length) {
+      return "Not enough E.G.O resources: " + missing.map(function (sin) {
+        return sin + " " + (Number(combatant.ownedSins[sin]) || 0) + "/" +
+          (Number(skill.ego.resourceCosts[sin]) || 0);
+      }).join(", ") + ".";
+    }
+    return "";
+  }
+  function payEgoCost(combatant, skill) {
+    if (!skill.ego) return;
+    EGO_SINS.forEach(function (sin) {
+      var cost = Number(skill.ego.resourceCosts[sin]) || 0;
+      combatant.ownedSins[sin] = Math.max(0, (Number(combatant.ownedSins[sin]) || 0) - cost);
+    });
+    combatant.sanity = Math.max(-45, combatant.sanity - (Number(skill.ego.sanityCost) || 0));
+  }
+  function combatantIdentity(combatant) {
+    return combatant.source === "identity" ? byId(combatant.identityId) : null;
+  }
+  function combatStaggerStage(combatant) {
+    var percentage = Math.max(0, Number(combatant.currentHp) || 0) /
+      Math.max(1, Number(combatant.maxHp) || 1) * 100;
+    return combatStaggerThresholds(combatant).filter(function (threshold) {
+      return percentage <= threshold;
+    }).length;
+  }
+  function combatStaggerDamageMultiplier(stage) {
+    return stage === 1 ? 2 : (stage === 2 ? 2.5 : (stage >= 3 ? 3 : 1));
+  }
+  function combatResistanceMultiplier(value, fallback) {
+    var multiplier = Number(value);
+    return Number.isFinite(multiplier) && multiplier >= 0 ? multiplier : fallback;
+  }
+  function combatDamageMultiplier(defender, skill) {
+    var identity = combatantIdentity(defender);
+    var physicalType = String(skill.type || "").toLocaleLowerCase();
+    var physicalValue = identity && identity.stats && identity.stats.resistances ?
+      identity.stats.resistances[physicalType] : "";
+    var staggerStage = combatStaggerStage(defender);
+    var physicalMultiplier = staggerStage ?
+      combatStaggerDamageMultiplier(staggerStage) :
+      combatResistanceMultiplier(physicalValue, 1);
+    var defensiveEgo = egoById(defender.defensiveEgoId);
+    var sinValue = defensiveEgo && skill.sin ? defensiveEgo.sinResistances[skill.sin] : "";
+    return {
+      physical: physicalMultiplier,
+      sin: combatResistanceMultiplier(sinValue, 1),
+      staggerStage: staggerStage
+    };
+  }
+  function applyCombatDamage(defender, skill, rawDamage, attackerPower) {
+    if (defender.evadeRound === combatState.round) {
+      var evadePower = Number(defender.evadePower) || 0;
+      defender.evadeRound = 0;
+      defender.evadePower = 0;
+      if (evadePower >= attackerPower) {
+        return { rawDamage: rawDamage, damage: 0, absorbed: 0, dodged: true, staggered: false };
+      }
+    }
+    var multipliers = combatDamageMultiplier(defender, skill);
+    var identity = combatantIdentity(defender);
+    var defenseMod = identity ? parseCombatValue(blankStats(identity.stats).defense) : 0;
+    if (!Number.isFinite(defenseMod)) defenseMod = 0;
+    var afterDefense = Math.max(0, rawDamage - defenseMod);
+    var damage = Math.floor(afterDefense * multipliers.physical * multipliers.sin);
+    var absorbed = Math.min(defender.shield, damage);
+    defender.shield -= absorbed;
+    var hpDamage = damage - absorbed;
+    var previousStage = combatStaggerStage(defender);
+    defender.currentHp = Math.max(0, defender.currentHp - hpDamage);
+    var nextStage = combatStaggerStage(defender);
+    var newlyStaggered = hpDamage > 0 && defender.shield === 0 && nextStage > previousStage;
+    if (newlyStaggered) {
+      defender.staggeredThroughRound = Math.max(defender.staggeredThroughRound, combatState.round + 1);
+    }
+    return {
+      rawDamage: rawDamage,
+      defenseMod: defenseMod,
+      damage: damage,
+      hpDamage: hpDamage,
+      absorbed: absorbed,
+      dodged: false,
+      staggered: newlyStaggered,
+      staggerStage: nextStage,
+      multipliers: multipliers
+    };
+  }
+  function combatDamageExplanation(result) {
+    if (result.dodged) return "evaded";
+    var details = [];
+    if (result.defenseMod) details.push("Defense " + (result.defenseMod > 0 ? "-" : "+") + Math.abs(result.defenseMod));
+    if (result.multipliers.physical !== 1) details.push("physical ×" + result.multipliers.physical);
+    if (result.multipliers.sin !== 1) details.push("Sin ×" + result.multipliers.sin);
+    if (result.multipliers.staggerStage) details.push("Stagger ×" + combatStaggerDamageMultiplier(result.multipliers.staggerStage));
+    return result.damage + " after" + (details.length ? " " + details.join(", ") : " modifiers");
+  }
+  function resolvePreparedCounter(defender, attacker) {
+    if (!defender.counterReady || defender.counterReadyRound !== combatState.round) return null;
+    var skill = defender.counterReady;
+    defender.counterReady = null;
+    defender.counterReadyRound = 0;
+    var threshold = combatCoinThreshold(defender.sanity);
+    if (threshold === null) return { message: defender.name + "'s Counter could not resolve at this Sanity value." };
+    var coins = normalizeCoinTypes(skill.coinTypes, skill.coinCount).map(function (coin, index) {
+      return { index: index, special: coin.special, cracked: false };
+    });
+    var attack = resolveCombatAttack(skill, threshold, coins);
+    var result = applyCombatDamage(attacker, skill, attack.damage, attack.clashPower);
+    return {
+      attack: attack,
+      result: result,
+      message: defender.name + " counters " + attacker.name + " for " + attack.damage +
+        " damage" + (result.dodged ? ", but the attack is evaded" :
+          (" (" + combatDamageExplanation(result) + "); " +
+            (result.absorbed ? attacker.name + " shield absorbs " + result.absorbed + ", " : "") +
+            attacker.name + " HP " + attacker.currentHp + "/" + attacker.maxHp + "."))
+    };
+  }
+  function combatantIsStaggerLocked(combatant) {
+    return Number(combatant.staggeredThroughRound) >= combatState.round;
+  }
+  function groupRoundSinCount(combatant, sin) {
+    return combatState.combatants.reduce(function (total, member) {
+      return total + (member.group === combatant.group ? Number(member.roundSins[sin]) || 0 : 0);
+    }, 0);
+  }
+  function passiveIsActive(passive, combatant) {
+    if (passive.permanentlyActive || passive.alwaysActive) return true;
+    var requirements = Array.isArray(passive.requirements) ? passive.requirements : [];
+    return requirements.length > 0 && requirements.every(function (requirement) {
+      var sin = requirement.sinType;
+      var amount = Number(requirement.sinAmount);
+      if (!COMBAT_SINS.includes(sin) || !Number.isFinite(amount) || amount < 1) return false;
+      var available = requirement.sinMode === "Resonance" ? groupRoundSinCount(combatant, sin) :
+        (requirement.sinMode === "Owned" ? combatant.ownedSins[sin] : 0);
+      return Number(available) >= amount;
+    });
+  }
+  function markEgoPassiveUsed(combatant, skill) {
+    if (!skill.ego || !skill.ego.id) return;
+    var identity = byId(combatant.identityId);
+    var character = identity && characterById(identity.characterId);
+    if (!character) return;
+    if (!character.usedEgoPassiveIds.includes(skill.ego.id)) {
+      character.usedEgoPassiveIds.push(skill.ego.id);
+      character.updatedAt = new Date().toISOString();
+      saveCharacterState();
+    }
+  }
+  function renderCombatantStatus(combatant, card) {
+    var ledger = card.querySelector('[data-view="owned-sins"]');
+    ledger.textContent = "";
+    COMBAT_SINS.forEach(function (sin) {
+      var item = document.createElement("span");
+      var resonanceCount = groupRoundSinCount(combatant, sin);
+      item.className = "combat-sin-chip" + (resonanceCount >= 2 ? " is-resonant" : "");
+      item.textContent = sin + " " + (Number(combatant.ownedSins[sin]) || 0);
+      item.title = combatant.group + " resonance: " + resonanceCount + " " + sin + " skill" +
+        (resonanceCount === 1 ? "" : "s") + " used this round";
+      ledger.appendChild(item);
+    });
+    var passiveList = card.querySelector('[data-view="passives"]');
+    passiveList.textContent = "";
+    var passives = combatPassivesFor(combatant);
+    if (!passives.length) {
+      passiveList.textContent = "No passives recorded.";
+      return;
+    }
+    passives.forEach(function (entry) {
+      var passive = entry.passive;
+      var active = passiveIsActive(passive, combatant);
+      var item = document.createElement("div");
+      item.className = "combat-passive" + (active ? " is-active" : "");
+      var title = document.createElement("strong");
+      title.textContent = (entry.source ? entry.source + " · " : "") + (passive.name || "Unnamed passive");
+      var state = document.createElement("span");
+      state.textContent = active ? "ACTIVE" : "INACTIVE";
+      var requirement = document.createElement("small");
+      requirement.textContent = passiveRequirementText(passive);
+      item.appendChild(title);
+      item.appendChild(state);
+      item.appendChild(requirement);
+      passiveList.appendChild(item);
+    });
+  }
+  function renderCombatPassiveSidebar() {
+    var sidebar = document.getElementById("combat-passive-sidebar");
+    var empty = document.getElementById("combat-passive-sidebar-empty");
+    var filterNote = document.getElementById("combat-passive-filter-note");
+    var activeOnly = state.settings.combatActivePassivesOnly;
+    sidebar.textContent = "";
+    filterNote.hidden = !activeOnly;
+    var total = 0;
+    combatState.combatants.forEach(function (combatant) {
+      var entries = combatPassivesFor(combatant).map(function (entry) {
+        return { passive: entry.passive, source: entry.source, active: passiveIsActive(entry.passive, combatant) };
+      }).filter(function (entry) {
+        return !activeOnly || entry.active;
+      });
+      if (!entries.length) return;
+      var group = document.createElement("section");
+      group.className = "combat-sidebar-passive-group";
+      var heading = document.createElement("h3");
+      heading.textContent = combatant.name;
+      group.appendChild(heading);
+      entries.forEach(function (entry) {
+        total += 1;
+        var item = document.createElement("article");
+        item.className = "combat-passive" + (entry.active ? " is-active" : "");
+        var title = document.createElement("strong");
+        title.textContent = (entry.source ? entry.source + " · " : "") + (entry.passive.name || "Unnamed passive");
+        var status = document.createElement("span");
+        status.textContent = entry.active ? "ACTIVE" : "INACTIVE";
+        var requirement = document.createElement("small");
+        requirement.textContent = passiveRequirementText(entry.passive);
+        item.appendChild(title);
+        item.appendChild(status);
+        item.appendChild(requirement);
+        group.appendChild(item);
+      });
+      sidebar.appendChild(group);
+    });
+    empty.hidden = total > 0;
+    if (!total) empty.textContent = activeOnly ? "No active passives." : "No passives recorded for the encounter.";
+  }
+  function renderCombatResonanceSidebar() {
+    var sidebar = document.getElementById("combat-resonance-sidebar");
+    var empty = document.getElementById("combat-resonance-sidebar-empty");
+    sidebar.textContent = "";
+    var groups = {};
+    combatState.combatants.forEach(function (combatant) {
+      var name = combatant.group || "Group 1";
+      if (!groups[name]) groups[name] = [];
+      groups[name].push(combatant);
+    });
+    var visible = 0;
+    Object.keys(groups).sort(function (left, right) { return left.localeCompare(right); }).forEach(function (name) {
+      var resonances = COMBAT_SINS.map(function (sin) {
+        return { sin: sin, count: groups[name].reduce(function (total, combatant) {
+          return total + (Number(combatant.roundSins[sin]) || 0);
+        }, 0) };
+      }).filter(function (entry) { return entry.count >= 2; });
+      if (!resonances.length) return;
+      var group = document.createElement("section");
+      group.className = "combat-resonance-group";
+      var heading = document.createElement("h3");
+      heading.textContent = name;
+      var counts = document.createElement("div");
+      counts.className = "combat-resonance-counts";
+      resonances.forEach(function (entry) {
+        var item = document.createElement("span");
+        item.textContent = entry.sin + " × " + entry.count;
+        counts.appendChild(item);
+        visible += 1;
+      });
+      group.appendChild(heading);
+      group.appendChild(counts);
+      sidebar.appendChild(group);
+    });
+    empty.hidden = visible > 0;
+  }
+  function ensureCombatInitiative() {
+    var changed = false;
+    combatState.combatants.forEach(function (combatant) {
+      if (combatant.initiativeRound === combatState.round && combatant.initiative !== null) return;
+      combatant.initiative = rollInitiative(combatant);
+      combatant.initiativeRound = combatState.round;
+      changed = true;
+    });
+    if (changed) saveCombatState();
+  }
+  function renderCombatLog() {
+    var log = document.getElementById("combat-log");
+    var empty = document.getElementById("combat-log-empty");
+    log.textContent = "";
+    combatState.log.slice().reverse().forEach(function (entry) {
+      var item = document.createElement("li");
+      item.textContent = "R" + entry.round + " · " + entry.message;
+      log.appendChild(item);
+    });
+    empty.hidden = combatState.log.length > 0;
+  }
+  function renderCombatant(combatant, animation) {
+    var card = document.getElementById("combatant-template").content.firstElementChild.cloneNode(true);
+    card.dataset.combatantId = combatant.id;
+    card.classList.add("combat-card-enter");
+    var animationClass = animation && animation[combatant.id];
+    if (animationClass) card.classList.add(animationClass);
+    function field(name) { return card.querySelector('[data-field="' + name + '"]'); }
+    var identitySelect = field("identity");
+    addCombatSelectOption(identitySelect, "", state.identities.length ? "Choose identity…" : "No identities available");
+    state.identities.slice().sort(function (left, right) { return left.name.localeCompare(right.name); }).forEach(function (identity) {
+      addCombatSelectOption(identitySelect, identity.id, identity.name + (characterName(identity.characterId) ? " — " + characterName(identity.characterId) : ""));
+    });
+    var sourceSelect = field("source");
+    var linkedIdentityForName = combatant.source === "identity" ? byId(combatant.identityId) : null;
+    if (combatant.source === "identity") combatant.name = linkedIdentityForName ? linkedIdentityForName.name : "Identity combatant";
+    if (linkedIdentityForName) combatant.speedRange = String(blankStats(linkedIdentityForName.stats).speed || "1-6");
+    field("name").readOnly = combatant.source === "identity";
+    field("name").title = combatant.source === "identity" ? "Managed by the selected Identity." : "";
+    field("speedRange").readOnly = combatant.source === "identity";
+    var speedRange = parseSpeedRange(combatant.speedRange);
+    field("speedRange").setAttribute("aria-invalid", speedRange.fallback ? "true" : "false");
+    field("speedRange").title = combatant.source === "identity" ? "Managed by the selected Identity." :
+      (speedRange.fallback ? "Unrecognized Speed range; initiative uses 1–6." : "");
+    var linkedMaxHp = linkedIdentityForName ? identityMaxHp(linkedIdentityForName) : 0;
+    field("maxHp").readOnly = linkedMaxHp > 0;
+    field("maxHp").title = linkedMaxHp > 0 ? "Calculated from Base Health, HP growth, and Level." : "";
+    card.querySelector(".combatant-name-label").firstChild.textContent =
+      combatant.source === "identity" ? "Identity name (managed) " : "Combatant name ";
+    var identityControls = card.querySelectorAll(".combat-identity-control");
+    card.querySelector('[data-action="remove"]').addEventListener("click", function () {
+      if (combatState.combatants.length <= 1) return;
+      combatState.combatants = combatState.combatants.filter(function (entry) { return entry.id !== combatant.id; });
+      saveCombatState();
+      renderCombatManager();
+    });
+    Array.from(card.querySelectorAll("[data-field]")).forEach(function (control) {
+      control.value = combatant[control.dataset.field] === undefined ? control.value : combatant[control.dataset.field];
+      control.addEventListener("change", function () {
+        syncCombatantFromCard(combatant, card);
+        if (control.dataset.field === "identity") {
+          combatant.skillKey = "";
+          combatant.skillDataKey = "";
+          combatant.drawnSkillKeys = [];
+          combatant.name = (byId(combatant.identityId) || {}).name || "Identity combatant";
+          identityCombatVitals(combatant);
+        }
+        if (control.dataset.field === "identity" || control.dataset.field === "skill" ||
+          control.dataset.field === "ego" || control.dataset.field === "egoMode") {
+          if (control.dataset.field === "identity") {
+            combatant.egoId = "";
+            combatant.egoMode = "Awakening";
+          }
+          if (control.dataset.field === "skill") {
+            combatant.skillKey = control.value;
+            combatant.egoId = "";
+          }
+          if (control.dataset.field === "ego") {
+            combatant.egoId = control.value;
+            var egoModes = availableEgoCombatSkills(byId(combatant.identityId), combatant.egoId)
+              .map(function (skill) { return skill.egoMode; });
+            combatant.egoMode = egoModes.indexOf("Awakening") !== -1 ? "Awakening" : (egoModes[0] || "Awakening");
+          }
+          if (control.dataset.field === "egoMode") combatant.egoMode = control.value;
+          if (control.dataset.field !== "identity") applyArchivedCombatSkill(combatant, card);
+          saveCombatState();
+          renderCombatManager();
+          return;
+        }
+        if (control.dataset.field === "source") {
+          if (combatant.source !== "identity") {
+            combatant.egoId = "";
+            combatant.egoMode = "Awakening";
+          }
+          saveCombatState();
+          renderCombatManager();
+          return;
+        }
+        if (control.dataset.field === "group") {
+          renderCombatManager();
+          saveCombatState();
+          return;
+        }
+        if (control.dataset.field === "coinCount") {
+          combatant.coinTypes = normalizeCoinTypes(combatant.coinTypes, coinCountValue(combatant.coinCount));
+          renderCoinTypeFields(card.querySelector('[data-view="combat-coin-types"]'), combatant.coinCount, combatant.coinTypes);
+          card.querySelectorAll('[data-view="combat-coin-types"] [data-coin-type-index]').forEach(function (coinSelect) {
+            coinSelect.addEventListener("change", function () {
+              syncCombatantFromCard(combatant, card);
+              saveCombatState();
+            });
+          });
+          saveCombatState();
+          return;
+        }
+        if (control.dataset.field === "currentHp" || control.dataset.field === "maxHp" ||
+          control.dataset.field === "staggerThresholds") {
+          syncCombatantFromCard(combatant, card);
+          field("currentHp").value = combatant.currentHp;
+          field("maxHp").value = combatant.maxHp;
+          renderCombatantVitals(combatant, card);
+          saveCombatState();
+          return;
+        }
+        renderCombatantStatus(combatant, card);
+        saveCombatState();
+      });
+    });
+    identitySelect.value = combatant.identityId || "";
+    sourceSelect.value = combatant.source;
+    identityControls.forEach(function (control) {
+      control.hidden = combatant.source !== "identity";
+      var input = control.querySelector("select");
+      if (input) input.disabled = combatant.source !== "identity";
+      var button = control.querySelector("button");
+      if (button) button.disabled = combatant.source !== "identity";
+    });
+    var skillSelect = field("skill");
+    var chosenIdentity = byId(combatant.identityId);
+    var options = chosenIdentity ? availableIdentityCombatSkills(chosenIdentity) : [];
+    var validSkillKeys = options.map(function (skill) { return skill.key; });
+    var filteredDrawnSkillKeys = combatant.drawnSkillKeys.filter(function (key) {
+      return validSkillKeys.indexOf(key) !== -1;
+    });
+    if (filteredDrawnSkillKeys.length !== combatant.drawnSkillKeys.length) {
+      combatant.drawnSkillKeys = filteredDrawnSkillKeys;
+      saveCombatState();
+    }
+    if (combatant.skillKey && validSkillKeys.indexOf(combatant.skillKey) === -1) {
+      combatant.skillKey = "";
+      combatant.skillDataKey = "";
+    }
+    addCombatSelectOption(skillSelect, "", options.length ? "Choose a skill…" : "No available skills");
+    options.forEach(function (skill) { addCombatSelectOption(skillSelect, skill.key, skill.name); });
+    skillSelect.value = options.some(function (skill) { return skill.key === combatant.skillKey; }) ? combatant.skillKey : "";
+    skillSelect.disabled = combatant.source !== "identity" || !options.length;
+    if (!skillSelect.value && combatant.skillKey) {
+      combatant.skillKey = "";
+      combatant.skillDataKey = "";
+    }
+    var egoSelect = field("ego");
+    addCombatSelectOption(egoSelect, "", "No E.G.O selected");
+    var egoChoices = chosenIdentity ? equippedEgosForCharacter(chosenIdentity.characterId).filter(function (ego) {
+      return availableEgoCombatSkills(chosenIdentity, ego.id).length > 0;
+    }) : [];
+    egoChoices.forEach(function (ego) { addCombatSelectOption(egoSelect, ego.id, ego.name); });
+    egoSelect.value = egoChoices.some(function (ego) { return ego.id === combatant.egoId; }) ? combatant.egoId : "";
+    if (!egoSelect.value && combatant.egoId) {
+      combatant.egoId = "";
+      combatant.egoMode = "Awakening";
+    }
+    egoSelect.disabled = combatant.source !== "identity" || !egoChoices.length;
+    var egoModeSelect = field("egoMode");
+    var egoModeControl = card.querySelector('[data-view="ego-mode-control"]');
+    var selectedEgoSkills = egoSelect.value ? availableEgoCombatSkills(chosenIdentity, egoSelect.value) : [];
+    var egoModes = [];
+    selectedEgoSkills.forEach(function (skill) {
+      if (egoModes.indexOf(skill.egoMode) === -1) egoModes.push(skill.egoMode);
+    });
+    addCombatSelectOption(egoModeSelect, "", "Choose mode…");
+    egoModes.forEach(function (mode) { addCombatSelectOption(egoModeSelect, mode, mode); });
+    if (egoModes.indexOf(combatant.egoMode) === -1) {
+      combatant.egoMode = egoModes.indexOf("Awakening") !== -1 ? "Awakening" : (egoModes[0] || "Awakening");
+    }
+    egoModeSelect.value = egoModes.indexOf(combatant.egoMode) !== -1 ? combatant.egoMode : "";
+    egoModeSelect.disabled = egoModes.length < 2;
+    egoModeControl.hidden = egoModes.length < 2;
+    var activeSkill = egoSelect.value ? selectedEgoCombatSkill(chosenIdentity, egoSelect.value, egoModeSelect.value) :
+      (options.find(function (skill) { return skill.key === skillSelect.value; }) || null);
+    if (activeSkill && combatant.skillDataKey !== activeSkill.key) applyArchivedCombatSkill(combatant, card);
+    var defensiveEgoSelect = field("defensiveEgo");
+    addCombatSelectOption(defensiveEgoSelect, "", "Use Identity resistances");
+    var defensiveEgos = chosenIdentity ? equippedEgosForCharacter(chosenIdentity.characterId) : [];
+    defensiveEgos.forEach(function (ego) {
+      addCombatSelectOption(defensiveEgoSelect, ego.id, ego.name);
+    });
+    defensiveEgoSelect.value = defensiveEgos.some(function (ego) { return ego.id === combatant.defensiveEgoId; }) ?
+      combatant.defensiveEgoId : "";
+    defensiveEgoSelect.disabled = combatant.source !== "identity" || !defensiveEgos.length;
+    field("name").value = combatant.name;
+    field("speedRange").value = combatant.speedRange;
+    card.querySelector('[data-view="initiative"]').textContent = "SPD " + combatant.initiative + " · " + combatant.speedRange +
+      (speedRange.fallback ? " (using 1–6)" : "");
+    renderCoinTypeFields(card.querySelector('[data-view="combat-coin-types"]'), combatant.coinCount, combatant.coinTypes);
+    card.querySelectorAll('[data-view="combat-coin-types"] [data-coin-type-index]').forEach(function (coinSelect) {
+      coinSelect.addEventListener("change", function () {
+        syncCombatantFromCard(combatant, card);
+        saveCombatState();
+      });
+    });
+    var drawButton = card.querySelector('[data-action="draw-skills"]');
+    var drawnSkillsContainer = card.querySelector('[data-view="drawn-skills"]');
+    var drawStatus = card.querySelector('[data-view="draw-status"]');
+    var drawnSkills = combatant.drawnSkillKeys.map(function (key) {
+      return options.find(function (skill) { return skill.key === key; });
+    }).filter(Boolean);
+    drawnSkillsContainer.textContent = "";
+    drawnSkillsContainer.hidden = !drawnSkills.length;
+    drawnSkills.forEach(function (skill) {
+      var choice = document.createElement("button");
+      choice.type = "button";
+      choice.className = "combat-drawn-skill" + (combatant.skillKey === skill.key ? " is-queued" : "");
+      choice.textContent = skill.name + " · weight " + combatSkillPoolWeight(skill) +
+        (combatant.skillKey === skill.key ? " · QUEUED" : "");
+      choice.addEventListener("click", function () {
+        combatant.skillKey = skill.key;
+        applyArchivedCombatSkill(combatant, card);
+        saveCombatState();
+        renderCombatManager();
+      });
+      drawnSkillsContainer.appendChild(choice);
+    });
+    var weightedOptionCount = options.filter(function (skill) { return combatSkillPoolWeight(skill) > 0; }).length;
+    if (combatant.source === "identity" && !drawnSkills.length) {
+      drawStatus.textContent = !options.length ? "This identity has no skills in its pool." :
+        (weightedOptionCount ? "Draw " + Math.min(2, weightedOptionCount) + " weighted skill" +
+          (weightedOptionCount === 1 ? "" : "s") + ", then queue one." : "No skills have a positive pool weight.");
+    } else if (drawnSkills.length < 2) {
+      drawStatus.textContent = drawnSkills.length ?
+        "The remaining skill stays available; a new weighted skill is drawn next round." :
+        "No drawn skills are available.";
+    } else {
+      drawStatus.textContent = "Choose one drawn skill to queue.";
+    }
+    drawButton.disabled = drawnSkills.length > 0 || combatantHasUsedSkillThisRound(combatant) ||
+      !weightedOptionCount;
+    drawButton.addEventListener("click", function () {
+      var identity = byId(combatant.identityId);
+      if (!identity || combatant.drawnSkillKeys.length || combatantHasUsedSkillThisRound(combatant)) return;
+      var drawn = drawCombatSkills(identity, [], 2);
+      combatant.drawnSkillKeys = drawn.map(function (skill) { return skill.key; });
+      appendCombatLog(combatant.name + " drew " + drawn.length + " skill" + (drawn.length === 1 ? "" : "s") + ".");
+      saveCombatState();
+      renderCombatManager();
+    });
+    card.querySelector('[data-action="use-skill"]').addEventListener("click", function () {
+      syncCombatantFromCard(combatant, card);
+      if (combatantIsStaggerLocked(combatant)) {
+        alert(combatant.name + " is Staggered and cannot use a skill this round.");
+        return;
+      }
+      var skill = selectedCombatSkill(combatant, card);
+      if (!skill || !skill.valid) { alert("Choose an identity skill or enter base power and coin count before using a skill."); return; }
+      if (!combatantCanUseSkill(combatant, skill)) {
+        alert(combatantHasUsedSkillThisRound(combatant) ?
+          combatant.name + " has already used a skill this round." :
+          "Draw skills from the pool and queue one before using an Identity skill.");
+        return;
+      }
+      var costFailure = egoCostFailure(combatant, skill);
+      if (costFailure) { alert(costFailure); return; }
+      var threshold = combatCoinThreshold(combatant.sanity);
+      if (threshold === null) { alert("Coin rolls are defined for SP 0, +25 to +45, or -45 to -25."); return; }
+      var roll = resolveCombatSkill(skill, threshold);
+      payEgoCost(combatant, skill);
+      markEgoPassiveUsed(combatant, skill);
+      recordSinUse(combatant, skill);
+      var skillAnimation = {};
+      skillAnimation[combatant.id] = "is-using-skill";
+      skillAnimation.coinResults = {};
+      skillAnimation.coinResults[combatant.id] = roll.coins;
+      var message = combatant.name + " used " + skill.name + ": " + formatCoinRolls(roll) +
+        " Clash Power " + roll.clashPower;
+      if (skill.ego) message += " · paid " + skill.ego.mode + " cost";
+      if (skill.type === "Guard") {
+        var shieldGained = Math.max(0, roll.clashPower);
+        combatant.shield += shieldGained;
+        message += " · Guard grants " + shieldGained + " shield.";
+      } else if (skill.type === "Evade") {
+        combatant.evadeRound = combatState.round;
+        combatant.evadePower = roll.clashPower;
+        message += " · Evade prepared at power " + roll.clashPower + " for the rest of this round.";
+      } else if (skill.type === "Counter") {
+        combatant.counterReady = skill;
+        combatant.counterReadyRound = combatState.round;
+        message += " · Counter prepared for an incoming attack this round.";
+      } else {
+        var attack = resolveCombatAttack(skill, threshold, normalizeCoinTypes(skill.coinTypes, skill.coinCount).map(function (coin, index) {
+          return { index: index, special: coin.special, cracked: false };
+        }));
+        var target = combatState.combatants.find(function (other) { return other.id === targetSelect.value; });
+        if (target) {
+          var damageResult = applyCombatDamage(target, skill, attack.damage, attack.clashPower);
+          message += " · One-sided attack for " + attack.damage + " damage (" +
+            combatDamageExplanation(damageResult) + ")" +
+            (damageResult.dodged ? "; " + target.name + " evaded." :
+              ("; " + target.name + " HP " + target.currentHp + "/" + target.maxHp +
+                (damageResult.absorbed ? ", shield absorbed " + damageResult.absorbed : "") +
+                (damageResult.staggered ? ", Staggered through round " + target.staggeredThroughRound : "") + "."));
+          skillAnimation[target.id] = damageResult.dodged ? "" : "is-taking-damage";
+          var counterResult = damageResult.dodged ? null : resolvePreparedCounter(target, combatant);
+          if (counterResult) message += " " + counterResult.message;
+        } else {
+          message += " · one-sided attack rolled " + attack.damage + " damage, but no target is selected.";
+        }
+        attack.coins.forEach(function (coin) {
+          if (!coin.round) coin.round = 1;
+        });
+        skillAnimation.coinResults[combatant.id] = roll.coins.concat(attack.coins);
+      }
+      consumeCombatantSkill(combatant, skill);
+      appendCombatLog(message + (skill.sin && skill.sin !== "Sinless" ? " · " + skill.sin + " +1 resource" : ""));
+      saveCombatState();
+      renderCombatManager(skillAnimation);
+    });
+    var targetSelect = field("target");
+    combatState.combatants.filter(function (other) { return other.id !== combatant.id; }).forEach(function (other) {
+      addCombatSelectOption(targetSelect, other.id, other.name || "Combatant");
+    });
+    var defaultTarget = combatState.combatants.find(function (other) { return other.id !== combatant.id; });
+    targetSelect.value = combatState.combatants.some(function (other) { return other.id === combatant.targetId; }) ?
+      combatant.targetId : (defaultTarget ? defaultTarget.id : "");
+    targetSelect.disabled = !defaultTarget;
+    card.querySelector('[data-action="clash"]').disabled = !defaultTarget;
+    card.querySelector('[data-action="clash"]').addEventListener("click", function () {
+      syncCombatantFromCard(combatant, card);
+      var opponent = combatState.combatants.find(function (other) { return other.id === targetSelect.value; });
+      var opponentCard = opponent && combatantCard(opponent.id);
+      if (!opponent || !opponentCard) return;
+      syncCombatantFromCard(opponent, opponentCard);
+      var firstSkill = selectedCombatSkill(combatant, card);
+      var secondSkill = selectedCombatSkill(opponent, opponentCard);
+      if (!firstSkill || !secondSkill || !firstSkill.valid || !secondSkill.valid) {
+        alert("Choose skills and enter base power and coin count for both combatants before resolving a clash.");
+        return;
+      }
+      if (!combatantCanUseSkill(combatant, firstSkill) || !combatantCanUseSkill(opponent, secondSkill)) {
+        alert(combatantHasUsedSkillThisRound(combatant) || combatantHasUsedSkillThisRound(opponent) ?
+          "Each combatant can use only one skill per round." :
+          "Draw skills from each Identity's pool and queue one before resolving a Clash.");
+        return;
+      }
+      if ((["Guard", "Counter"].includes(firstSkill.type) && !firstSkill.clashable) ||
+        (["Guard", "Counter"].includes(secondSkill.type) && !secondSkill.clashable)) {
+        alert("Guard and Counter skills can Clash only when marked Clashable in the Identity Archive.");
+        return;
+      }
+      if (combatantIsStaggerLocked(combatant) || combatantIsStaggerLocked(opponent)) {
+        alert("A Staggered combatant cannot take part in a Clash. Use a one-sided attack against a Staggered target instead.");
+        return;
+      }
+      var firstCostFailure = egoCostFailure(combatant, firstSkill);
+      var secondCostFailure = egoCostFailure(opponent, secondSkill);
+      if (firstCostFailure || secondCostFailure) {
+        alert([firstCostFailure && combatant.name + ": " + firstCostFailure,
+          secondCostFailure && opponent.name + ": " + secondCostFailure].filter(Boolean).join("\n"));
+        return;
+      }
+      var firstThreshold = combatCoinThreshold(combatant.sanity);
+      var secondThreshold = combatCoinThreshold(opponent.sanity);
+      if (firstThreshold === null || secondThreshold === null) { alert("Coin rolls are defined for SP 0, +25 to +45, or -45 to -25."); return; }
+      var clash = resolveCombatClash(firstSkill, firstThreshold, secondSkill, secondThreshold);
+      payEgoCost(combatant, firstSkill);
+      payEgoCost(opponent, secondSkill);
+      markEgoPassiveUsed(combatant, firstSkill);
+      markEgoPassiveUsed(opponent, secondSkill);
+      recordSinUse(combatant, firstSkill);
+      recordSinUse(opponent, secondSkill);
+      var names = [combatant.name, opponent.name];
+      var message = clash.rounds.map(function (round) {
+        var rolls = round.coins.map(function (coin, sideIndex) {
+          var state = coin.outcome === "cracked" ? " cracks" :
+            (coin.outcome === "excised" ? " is excised" :
+              (coin.outcome === "broken" ? " breaks" : ""));
+          return names[sideIndex] + " " + coinTypeLabel({ type: coin.type || coin.special }) +
+            " " + coin.side + " (" + coin.clashPower + ")" + state;
+        });
+        var result = "Clash " + round.number + ": " + rolls.join(" vs ");
+        if (round.winner !== null) result += " · " + names[round.winner] + " wins";
+        else result += " · tie";
+        round.coins.forEach(function (coin, sideIndex) {
+          if (coin.shield) result += " · " + names[sideIndex] + " gains " + coin.shield + " shield";
+        });
+        return result;
+      }).join(". ");
+      var clashAnimation = {};
+      clashAnimation.coinResults = {};
+      clashAnimation.coinResults[combatant.id] = clash.sides[0].results.slice();
+      clashAnimation.coinResults[opponent.id] = clash.sides[1].results.slice();
+      combatant.shield += clash.shieldGained[0];
+      opponent.shield += clash.shieldGained[1];
+      if (clash.attack) {
+        var winner = clash.winner === 0 ? combatant : opponent;
+        var loser = clash.winner === 0 ? opponent : combatant;
+        var winningSkill = clash.winner === 0 ? firstSkill : secondSkill;
+        var damageResult = applyCombatDamage(loser, winningSkill, clash.attack.damage, clash.attack.clashPower);
+        clashAnimation.coinResults[winner.id] = clashAnimation.coinResults[winner.id].concat(clash.attack.coins);
+        var attackDetails = clash.attack.coins.map(function (coin) {
+          return coinTypeLabel({ type: coin.type || coin.special }) + " " +
+            coin.side + " (" + (coin.damageRolls || []).map(function (roll, index) {
+              return roll + (coin.criticalRolls[index] ? "×2" : "");
+            }).join(" + ") + ") = " + coin.damage +
+            (coin.critical ? " critical" : "") + (coin.outcome === "cracked attack" ? " half damage" : "");
+        });
+        message += (message ? ". " : "") + winner.name + " attacks with " + attackDetails.join("; ") +
+          " for " + clash.attack.damage + " damage" +
+          (clash.attack.flatDamage ? " (including " + clash.attack.flatDamage + " flat)" : "") +
+          (damageResult.dodged ? "; " + loser.name + " evaded." :
+            (" (" + combatDamageExplanation(damageResult) +
+              (damageResult.absorbed ? "; " + damageResult.absorbed + " absorbed by shield" : "") + ")" +
+              "; " + loser.name + " HP " +
+              loser.currentHp + "/" + loser.maxHp +
+              (damageResult.staggered ? ", Staggered through round " + loser.staggeredThroughRound : "") + "."));
+        if (!damageResult.dodged) {
+          var counterResult = resolvePreparedCounter(loser, winner);
+          if (counterResult) message += " " + counterResult.message;
+        }
+        clash.shieldGained.forEach(function (amount, sideIndex) {
+          if (amount) message += " " + names[sideIndex] + " gains " + amount + " shield.";
+        });
+        clashAnimation[winner.id] = "is-winning-clash";
+        clashAnimation[loser.id] = "is-taking-damage";
+      } else {
+        if (!message) message = "Neither skill has Coins available to clash; no damage rolled.";
+        else message += ". Tie; no attack.";
+      }
+      consumeCombatantSkill(combatant, firstSkill);
+      consumeCombatantSkill(opponent, secondSkill);
+      appendCombatLog(message);
+      saveCombatState();
+      renderCombatManager(clashAnimation);
+    });
+    renderCombatantStatus(combatant, card);
+    renderCombatantVitals(combatant, card);
+    card.querySelector('[data-view="shield"]').textContent = "Shield " + combatant.shield;
+    var coinResults = animation && animation.coinResults && animation.coinResults[combatant.id];
+    if (coinResults) renderCoinRollAnimation(card, coinResults);
+    return card;
+  }
+  function combatCoinThreshold(sanity) {
+    return sanity === 0 ? 3 : (sanity >= 25 ? 2 : (sanity <= -25 ? 4 : null));
+  }
+  function rollCombatDie(sides) { return Math.floor(Math.random() * sides) + 1; }
+  function rollCombatCoin(skill, index, threshold) {
+    var result = rollCombatDie(4);
+    var side = result >= threshold ? "Heads" : "Tails";
+    var coin = normalizeCoinTypes(skill.coinTypes, skill.coinCount)[index];
+    var powerChange = side === "Heads" ? Math.abs(skill.coinPower) : 0;
+    return {
+      type: coin.type,
+      special: coin.type === "Normal" ? "None" : coin.type,
+      index: index,
+      roll: result,
+      side: side,
+      powerChange: powerChange
+    };
+  }
+  function resolveCombatSkill(skill, threshold) {
+    var clashPower = skill.basePower;
+    var coins = [];
+    for (var index = 0; index < skill.coinCount; index += 1) {
+      var coin = rollCombatCoin(skill, index, threshold);
+      clashPower += coin.powerChange;
+      coin.powerAfter = clashPower;
+      coins.push(coin);
+    }
+    return { coins: coins, clashPower: clashPower };
+  }
+  function formatCoinRolls(roll) {
+    if (!roll.coins.length) return "No Coins";
+    return roll.coins.map(function (coin) {
+      var change = coin.powerChange > 0 ? "+" + coin.powerChange :
+        (coin.powerChange < 0 ? String(coin.powerChange) : "no change");
+      return coinTypeLabel({ type: coin.type || coin.special }) +
+        " " + coin.side + " (d4 " + coin.roll + ", " + change + ")";
+    }).join("; ");
+  }
+  function resolveCombatAttack(skill, threshold, coinStates) {
+    var attack = { coins: [], damage: 0, rolls: [], crits: 0, flatDamage: 0, clashPower: skill.basePower };
+    (coinStates || []).forEach(function (coinState) {
+        var coin = rollCombatCoin(skill, coinState.index, threshold);
+        coin.special = coinState.special || coin.special;
+        coin.outcome = coinState.cracked ? "cracked attack" : "attack";
+        coin.critical = coin.special === "Concentration" && coinState.cracked;
+        var coinDamage = 0;
+        coin.damageRolls = [];
+        coin.criticalRolls = [];
+        for (var dieIndex = 0; dieIndex < skill.rank; dieIndex += 1) {
+          var dieRoll = rollCombatDie(skill.die);
+          var critical = dieRoll === skill.die;
+          var dieDamage = dieRoll * (critical ? 2 : 1);
+          if (critical) {
+            coin.critical = true;
+            attack.crits += 1;
+          }
+          coin.criticalRolls.push(critical);
+          if (state.settings.flatDamageMode === "per-die") dieDamage += skill.flatDamage;
+          coin.damageRolls.push(dieRoll);
+          coinDamage += dieDamage;
+        }
+        attack.clashPower += coin.powerChange;
+        if (coinState.cracked) coinDamage = Math.floor(coinDamage / 2);
+        if (coin.special === "Concentration" && coinState.cracked) {
+          coinDamage *= 2;
+          attack.crits += 1;
+        }
+        coin.damage = coinDamage;
+        attack.damage += coinDamage;
+        attack.coins.push(coin);
+    });
+    if (state.settings.flatDamageMode === "per-skill" && attack.coins.length) {
+        attack.flatDamage = skill.flatDamage;
+        attack.damage += attack.flatDamage;
+    }
+    return attack;
+  }
+  function resolveCombatClash(firstSkill, firstThreshold, secondSkill, secondThreshold) {
+    function makeCoins(skill) {
+      return normalizeCoinTypes(skill.coinTypes, skill.coinCount).map(function (coin, index) {
+        return { type: coin.type, special: coin.type === "Normal" ? "None" : coin.type, index: index, broken: false, cracked: false };
+      });
+    }
+    var sides = [
+      { skill: firstSkill, threshold: firstThreshold, coins: makeCoins(firstSkill), results: [] },
+      { skill: secondSkill, threshold: secondThreshold, coins: makeCoins(secondSkill), results: [] }
+    ];
+    var rounds = [];
+    var shieldGained = [0, 0];
+    var winner = null;
+    for (var round = 1; round <= 40; round += 1) {
+      var active = sides.map(function (side) {
+        for (var index = side.coins.length - 1; index >= 0; index -= 1) {
+          if (!side.coins[index].broken && !side.coins[index].cracked) return side.coins[index];
+        }
+        return null;
+      });
+      if (!active[0] || !active[1]) {
+        winner = active[0] ? 0 : (active[1] ? 1 : winner);
+        break;
+      }
+      var roundResults = sides.map(function (side, sideIndex) {
+        var coin = rollCombatCoin(side.skill, active[sideIndex].index, side.threshold);
+        coin.special = active[sideIndex].special;
+        coin.round = round;
+        coin.clashPower = side.skill.basePower + coin.powerChange;
+        return coin;
+      });
+      var firstPower = roundResults[0].clashPower;
+      var secondPower = roundResults[1].clashPower;
+      var loserIndex = firstPower === secondPower ? -1 : (firstPower < secondPower ? 0 : 1);
+      roundResults.forEach(function (coin, sideIndex) {
+        coin.outcome = loserIndex === -1 ? "tie" : (sideIndex === loserIndex ? "lost" : "won");
+      });
+      var roundResult = { number: round, coins: roundResults, winner: loserIndex === -1 ? null : 1 - loserIndex };
+      if (loserIndex === -1) {
+        rounds.push(roundResult);
+        sides.forEach(function (side, sideIndex) { side.results.push(roundResults[sideIndex]); });
+        winner = null;
+        break;
+      }
+      var winningCoin = active[1 - loserIndex];
+      var losingCoin = active[loserIndex];
+      var losingSide = sides[loserIndex];
+      if ((losingCoin.special === "Unbreakable" || losingCoin.special === "Concentration") &&
+        winningCoin.special !== "Excision") {
+        losingCoin.cracked = true;
+        roundResults[loserIndex].outcome = "cracked";
+        if (losingCoin.special === "Concentration") {
+          var shieldRoll = rollCombatCoin(losingSide.skill, losingCoin.index, losingSide.threshold);
+          shieldRoll.special = losingCoin.special;
+          var shield = Math.max(1, losingSide.skill.basePower + shieldRoll.powerChange);
+          shieldGained[loserIndex] += shield;
+          roundResults[loserIndex].shieldRoll = shieldRoll;
+          roundResults[loserIndex].shield = shield;
+        }
+      } else {
+        losingCoin.broken = true;
+        roundResults[loserIndex].outcome =
+          winningCoin.special === "Excision" && (losingCoin.special === "Unbreakable" || losingCoin.special === "Concentration") ?
+            "excised" : "broken";
+      }
+      roundResult.winner = 1 - loserIndex;
+      rounds.push(roundResult);
+      sides.forEach(function (side, sideIndex) { side.results.push(roundResults[sideIndex]); });
+      winner = 1 - loserIndex;
+    }
+    var attack = null;
+    if (winner !== null) {
+      var attackSide = sides[winner];
+      var remaining = attackSide.coins.filter(function (coin) { return !coin.broken; });
+      attack = resolveCombatAttack(attackSide.skill, attackSide.threshold, remaining);
+      attack.side = winner;
+    }
+    return {
+      rounds: rounds,
+      sides: sides,
+      winner: winner,
+      attack: attack,
+      shieldGained: shieldGained
+    };
+  }
+  function renderCoinRollAnimation(card, coins) {
+    var animation = document.createElement("div");
+    animation.className = "coin-roll-animation";
+    animation.setAttribute("aria-label", "Coin and clash results");
+    var title = document.createElement("strong");
+    title.textContent = coins.some(function (coin) { return coin.round; }) ? "Clash and attack Coins" : "Coin toss";
+    animation.appendChild(title);
+    var list = document.createElement("div");
+    list.className = "coin-roll-list";
+    coins.forEach(function (coin, index) {
+      var token = document.createElement("div");
+      var typeValue = coin.type || "Normal";
+      token.className = "coin-roll-token is-" + coin.side.toLocaleLowerCase() +
+        " is-" + typeValue.toLocaleLowerCase() +
+        (coin.special && coin.special !== "None" ? " is-special-" + coin.special.toLocaleLowerCase() : "") +
+        (coin.outcome ? " is-" + coin.outcome.replace(/\s+/g, "-") : "") +
+        (coin.critical ? " is-critical" : "");
+      token.style.animationDelay = index * 90 + "ms";
+      token.setAttribute("aria-label", coinTypeLabel({ type: typeValue }) +
+        ": " + coin.side + ", d4 " + coin.roll + (coin.outcome ? ", " + coin.outcome : ""));
+      var type = document.createElement("strong");
+      type.textContent = coinTypeLabel({ type: typeValue }) +
+        (coin.round ? " · Clash " + coin.round : "");
+      var side = document.createElement("span");
+      side.textContent = coin.side;
+      var result = document.createElement("small");
+      result.textContent = "d4 " + coin.roll + (coin.powerChange ?
+        " · " + (coin.powerChange > 0 ? "+" : "") + coin.powerChange : " · no power change") +
+        (coin.outcome ? " · " + coin.outcome : "") +
+        (coin.shield ? " · shield +" + coin.shield : "") +
+        (coin.critical ? " · CRITICAL" : "") +
+        (coin.damage !== undefined ? " · damage " + coin.damage : "");
+      token.appendChild(type);
+      token.appendChild(side);
+      token.appendChild(result);
+      list.appendChild(token);
+    });
+    animation.appendChild(list);
+    card.insertBefore(animation, card.querySelector(".combatant-actions"));
+  }
+  function renderCombatManager(animations) {
+    var identityVitalsChanged = combatState.combatants.reduce(function (changed, combatant) {
+      return synchronizeIdentityVitals(combatant, false) || changed;
+    }, false);
+    if (identityVitalsChanged) saveCombatState();
+    ensureCombatInitiative();
+    document.getElementById("combat-round-number").textContent = combatState.round;
+    var grid = document.getElementById("combatant-grid");
+    grid.textContent = "";
+    combatState.combatants.slice().sort(function (left, right) {
+      return right.initiative - left.initiative || left.name.localeCompare(right.name);
+    }).forEach(function (combatant) {
+      grid.appendChild(renderCombatant(combatant, animations));
+    });
+    renderCombatLog();
+    renderCombatResonanceSidebar();
+    renderCombatPassiveSidebar();
+  }
+  document.getElementById("combat-add-combatant").addEventListener("click", function () {
+    combatState.combatants.push(freshCombatant("Combatant " + (combatState.combatants.length + 1)));
+    saveCombatState();
+    renderCombatManager();
+  });
+  document.getElementById("combat-end-round").addEventListener("click", function () {
+    combatState.round += 1;
+    combatState.combatants.forEach(function (combatant) {
+      COMBAT_SINS.forEach(function (sin) { combatant.roundSins[sin] = 0; });
+      var identity = combatant.source === "identity" ? byId(combatant.identityId) : null;
+      if (identity && combatant.drawnSkillKeys.length < 2) {
+        var newSkills = drawCombatSkills(identity, combatant.drawnSkillKeys, 2 - combatant.drawnSkillKeys.length);
+        combatant.drawnSkillKeys = combatant.drawnSkillKeys.concat(newSkills.map(function (skill) { return skill.key; }));
+        if (newSkills.length) {
+          appendCombatLog(combatant.name + " drew " + newSkills.length + " new skill" +
+            (newSkills.length === 1 ? "" : "s") + " and kept any unused skill.");
+        }
+      }
+    });
+    appendCombatLog("Round " + (combatState.round - 1) + " ended.");
+    saveCombatState();
+    renderCombatManager();
+    var roundBar = document.querySelector(".combat-round-bar");
+    roundBar.classList.remove("is-round-advancing");
+    void roundBar.offsetWidth;
+    roundBar.classList.add("is-round-advancing");
+  });
+  document.getElementById("combat-reset-encounter").addEventListener("click", function () {
+    if (!confirm("Reset this encounter and clear all combatants, Sin resources, and action history?")) return;
+    combatState = freshCombatState();
+    saveCombatState();
+    renderCombatManager();
+  });  var rulesSearchInput = document.getElementById("rules-search-input");
   var rulesReference = document.getElementById("rules-reference");
   var rulesSearchResults = document.getElementById("rules-search-results");
   var rulesNoResults = document.getElementById("rules-no-results");
@@ -2629,12 +4354,20 @@
   });
   function showPage(pageName) {
     if (!pages[pageName]) return;
+    if (pageName === "combat-tracker" && !combatAccessUnlocked()) {
+      settingsReturnPage = "main-menu";
+      pageName = "settings";
+      document.getElementById("combat-access-status").textContent = "Enter the beta code in Settings to enable the Combat Manager.";
+    }
     if (pageName === "settings") {
       if (activePage !== "settings") settingsReturnPage = activePage;
       maxLevelInput.value = state.settings.maxLevel;
       themeSelect.value = state.settings.theme;
+      document.getElementById("flat-damage-mode").value = state.settings.flatDamageMode;
+      document.getElementById("combat-active-passives-only").checked = state.settings.combatActivePassivesOnly;
     }
     if (pageName === "character-manager") renderCharacterArchive();
+    if (pageName === "combat-tracker") renderCombatManager();
     Object.keys(pages).forEach(function (key) {
       pages[key].hidden = key !== pageName;
     });
@@ -2698,6 +4431,26 @@
   window.addEventListener("resize", hideStatusEffectTooltip);
   var maxLevelInput = document.getElementById("max-level-input");
   var themeSelect = document.getElementById("theme-select");
+  function combatAccessUnlocked() {
+    return sessionStorage.getItem(COMBAT_ACCESS_SESSION_KEY) === "true";
+  }
+  function updateCombatAccessUi() {
+    var unlocked = combatAccessUnlocked();
+    document.getElementById("combat-launch-card").hidden = !unlocked;
+    document.getElementById("combat-access-status").textContent = unlocked ?
+      "Combat Manager is enabled for this browser tab." : "Combat Manager is locked.";
+    return unlocked;
+  }
+  async function hashCombatAccessCode(code) {
+    if (!window.crypto || !window.crypto.subtle || !window.TextEncoder) {
+      throw new Error("Secure code verification is unavailable in this browser context.");
+    }
+    var digest = await window.crypto.subtle.digest("SHA-256", new window.TextEncoder().encode(code));
+    return Array.from(new Uint8Array(digest)).map(function (value) {
+      return value.toString(16).padStart(2, "0");
+    }).join("");
+  }
+  updateCombatAccessUi();
   maxLevelInput.value = state.settings.maxLevel;
   themeSelect.value = state.settings.theme;
   document.getElementById("settings-button").addEventListener("click", function () {
@@ -2705,6 +4458,27 @@
   });
   document.getElementById("back-to-previous-page").addEventListener("click", function () {
     showPage(settingsReturnPage);
+  });
+  document.getElementById("unlock-combat-manager").addEventListener("click", async function () {
+    var button = this;
+    var codeField = document.getElementById("combat-access-code");
+    button.disabled = true;
+    try {
+      var digest = await hashCombatAccessCode(codeField.value);
+      if (digest !== COMBAT_ACCESS_CODE_SHA256) {
+        document.getElementById("combat-access-status").textContent = "That code is not valid.";
+        codeField.select();
+        return;
+      }
+      sessionStorage.setItem(COMBAT_ACCESS_SESSION_KEY, "true");
+      codeField.value = "";
+      updateCombatAccessUi();
+    } catch (error) {
+      console.warn("Could not verify the Combat Manager access code.", error);
+      document.getElementById("combat-access-status").textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
   });
   document.getElementById("settings-form").addEventListener("submit", function (event) {
     event.preventDefault();
@@ -2722,7 +4496,10 @@
     }
     state.settings.maxLevel = maxLevel;
     state.settings.theme = normalizeTheme(themeSelect.value);
+    state.settings.flatDamageMode = document.getElementById("flat-damage-mode").value === "per-die" ? "per-die" : "per-skill";
+    state.settings.combatActivePassivesOnly = document.getElementById("combat-active-passives-only").checked;
     applyTheme(state.settings.theme);
+    updateCombatAccessUi();
     if (!saveState()) return;
     form.elements.namedItem("level").max = maxLevel;
     alert("Settings saved.");
@@ -2773,7 +4550,8 @@
       announcers: announcerState.announcers,
       statusEffects: statusEffectState.statusEffects,
       statusEffectDefaultSeedVersion: statusEffectState.defaultSeedVersion || 0,
-      characters: characterState.characters
+      characters: characterState.characters,
+      combatEncounter: combatState
     });
   });
 
@@ -2810,7 +4588,7 @@
           !imported.characters.every(function (record) { return String(record.name || "").trim(); })) {
           throw new Error("The backup contains a record with missing required fields.");
         }
-        if (!confirm("Import this backup? It will replace all current archives and application settings.")) return;
+        if (!confirm("Import this backup? It will replace all current archives, the combat encounter, and application settings.")) return;
 
         var importedIdentities = imported.identities.filter(function (identity) { return identity.source !== "wiki"; })
           .map(function (identity) {
@@ -2824,12 +4602,13 @@
           return Math.max(highest, Number(identity.level) || 0);
         }, 0);
         var importedMaxLevel = Number(imported.settings.maxLevel);
+        var importedSettings = normalizeSettings(imported.settings);
+        importedSettings.maxLevel = Math.max(importedSettings.maxLevel,
+          Number.isInteger(importedMaxLevel) && importedMaxLevel > 0 ? importedMaxLevel : 40,
+          highestIdentityLevel);
         var importedState = {
           schemaVersion: STATE_VERSION,
-          settings: {
-            maxLevel: Math.max(Number.isInteger(importedMaxLevel) && importedMaxLevel > 0 ? importedMaxLevel : 40, highestIdentityLevel),
-            theme: normalizeTheme(imported.settings.theme)
-          },
+          settings: importedSettings,
           identities: importedIdentities
         };
         var importedEgoState = {
@@ -2849,12 +4628,14 @@
           schemaVersion: CHARACTER_SCHEMA_VERSION,
           characters: imported.characters.map(function (character) { return migrateCharacter(character); })
         };
+        var importedCombatState = normalizeCombatState(imported.combatEncounter);
         var storage = [
           [STORAGE_KEY, importedState],
           [EGO_STORAGE_KEY, importedEgoState],
           [ANNOUNCER_STORAGE_KEY, importedAnnouncerState],
           [STATUS_EFFECT_STORAGE_KEY, importedStatusEffectState],
-          [CHARACTER_STORAGE_KEY, importedCharacterState]
+          [CHARACTER_STORAGE_KEY, importedCharacterState],
+          [COMBAT_STORAGE_KEY, importedCombatState]
         ];
         var previousStorage = storage.map(function (entry) {
           return { key: entry[0], value: localStorage.getItem(entry[0]) };
@@ -2880,6 +4661,7 @@
         announcerState = importedAnnouncerState;
         statusEffectState = importedStatusEffectState;
         characterState = importedCharacterState;
+        combatState = importedCombatState;
         selectedId = null;
         egoSelectedId = null;
         announcerSelectedId = null;
@@ -2887,6 +4669,8 @@
         characterSelectedId = null;
         maxLevelInput.value = state.settings.maxLevel;
         themeSelect.value = state.settings.theme;
+        document.getElementById("flat-damage-mode").value = state.settings.flatDamageMode;
+        document.getElementById("combat-active-passives-only").checked = state.settings.combatActivePassivesOnly;
         applyTheme(state.settings.theme);
         form.elements.namedItem("level").max = state.settings.maxLevel;
         hideStatusEffectTooltip();
@@ -2895,7 +4679,7 @@
         renderAnnouncerArchive();
         renderStatusEffectArchive();
         renderCharacterArchive();
-        alert("Backup imported successfully. All archives and settings were replaced.");
+        alert("Backup imported successfully. All data and the combat encounter were replaced.");
       } catch (error) {
         alert("Could not import this backup: " + error.message);
       } finally {
@@ -2910,8 +4694,8 @@
   });
 
   document.getElementById("clear-local-data-button").addEventListener("click", function () {
-    if (!confirm("Clear all archive data and settings saved by this app in this browser? This cannot be undone. Export a backup first if you want to keep a copy.")) return;
-    var keys = [STORAGE_KEY, EGO_STORAGE_KEY, ANNOUNCER_STORAGE_KEY, STATUS_EFFECT_STORAGE_KEY, CHARACTER_STORAGE_KEY];
+    if (!confirm("Clear all archive data, the combat encounter, and settings saved by this app in this browser? This cannot be undone. Export a backup first if you want to keep a copy.")) return;
+    var keys = [STORAGE_KEY, EGO_STORAGE_KEY, ANNOUNCER_STORAGE_KEY, STATUS_EFFECT_STORAGE_KEY, CHARACTER_STORAGE_KEY, COMBAT_STORAGE_KEY];
     var previousStorage = keys.map(function (key) {
       return { key: key, value: localStorage.getItem(key) };
     });

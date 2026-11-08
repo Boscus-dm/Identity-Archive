@@ -52,9 +52,9 @@
             <span class="archive-card-copy"><span class="archive-card-status">AVAILABLE</span><strong>Status Effect Archive</strong><span>Create and organize status effects referenced across archive descriptions.</span></span>
             <span class="archive-card-arrow" aria-hidden="true">→</span>
           </button>
-          <button class="archive-launch-card is-wip" type="button" data-page="combat-tracker">
+          <button id="combat-launch-card" class="archive-launch-card" type="button" data-page="combat-tracker" hidden>
             <span class="archive-card-icon" aria-hidden="true">⚔</span>
-            <span class="archive-card-copy"><span class="archive-card-status">WORK IN PROGRESS</span><strong>Combat Tracker</strong><span>Tools for tracking combat encounters will be added later.</span></span>
+            <span class="archive-card-copy"><span class="archive-card-status">AVAILABLE</span><strong>Combat Manager</strong><span>Track rounds and combatants, use skills, and resolve clashes.</span></span>
             <span class="archive-card-arrow" aria-hidden="true">→</span>
           </button>
           <button class="archive-launch-card" type="button" data-page="rules-mechanics">
@@ -69,7 +69,6 @@
           </button>
         </div>
       </section>
-
       <section id="archive-page" hidden>
       <section class="intro">
         <div>
@@ -103,8 +102,8 @@
             <label>Rarity
               <select id="rarity-filter">
                 <option value="">All rarities</option>
-                <option value="N/A">N/A</option>
                 <option value="1">1★</option><option value="2">2★</option><option value="3">3★</option>
+                <option value="2-walpurgis">2★ Walpurgis</option><option value="3-walpurgis">3★ Walpurgis</option>
               </select>
             </label>
           </div>
@@ -153,8 +152,8 @@
             <label class="search-box"><span class="sr-only">Search E.G.O</span><span aria-hidden="true">⌕</span><input id="ego-search-input" type="search" placeholder="Search names, characters, effects…" autocomplete="off"><kbd>/</kbd></label>
             <div class="filters">
               <label>Character<select id="ego-character-filter"><option value="">All characters</option></select></label>
-              <label>Risk level<select id="ego-risk-filter"><option value="">All levels</option><option value="N/A">N/A</option><option>ZAYIN</option><option>TETH</option><option>HE</option><option>WAW</option><option>ALEPH</option></select></label>
-              <label>Sin affinity<select id="ego-affinity-filter"><option value="">All affinities</option><option value="N/A">N/A</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
+              <label>Risk level<select id="ego-risk-filter"><option value="">All levels</option><option>ZAYIN</option><option>TETH</option><option>HE</option><option>WAW</option><option>ALEPH</option></select></label>
+              <label>Sin affinity<select id="ego-affinity-filter"><option value="">All affinities</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
             </div>
             <div class="list-toolbar"><span>E.G.O RECORDS</span><label class="sort-control"><span class="sr-only">Sort E.G.O</span><select id="ego-sort-filter" aria-label="Sort E.G.O"><option value="character">By character</option><option value="risk">By risk level</option><option value="affinity">By sin affinity</option><option value="name">A–Z</option><option value="recent">Recently added</option></select></label></div>
             <div id="ego-list" class="identity-list" role="listbox" aria-label="E.G.O records"></div>
@@ -242,11 +241,116 @@
 
       <section id="combat-tracker-page" class="placeholder-page" hidden>
         <div class="settings-heading">
-          <div><p class="eyebrow">LIMBUS COMPANY · TOOLS</p><h1>Combat Tracker</h1></div>
+          <div><p class="eyebrow">LIMBUS COMPANY · COMBAT MANAGER</p><h1>Combat Manager</h1></div>
           <button class="button button-quiet" type="button" data-page="main-menu">← Main Menu</button>
         </div>
-        <section class="wip-panel"><span class="wip-label">WORK IN PROGRESS</span><h2>This tool is not ready yet</h2><p>The Combat Tracker will be added in a future update.</p></section>
+        <div class="combat-dashboard">
+          <section class="combat-board">
+            <header class="combat-round-bar">
+              <div><p class="eyebrow">ENCOUNTER</p><h2>Round <span id="combat-round-number">1</span></h2></div>
+              <div class="combat-round-actions">
+                <button id="combat-add-combatant" class="button button-quiet" type="button">＋ Add combatant</button>
+                <button id="combat-end-round" class="button button-primary" type="button">End round →</button>
+              </div>
+            </header>
+            <div id="combatant-grid" class="combatant-grid"></div>
+          </section>
+          <aside class="combat-sidebar">
+            <section class="combat-sidebar-panel">
+              <p class="eyebrow">ENCOUNTER LOG</p><h2>Round actions</h2>
+              <ol id="combat-log" class="combat-log"></ol>
+              <p id="combat-log-empty" class="quiet-copy">No skills used this encounter.</p>
+            </section>
+            <section class="combat-sidebar-panel">
+              <p class="eyebrow">CURRENT ROUND</p><h2>Resonance</h2>
+              <div id="combat-resonance-sidebar" class="combat-resonance-sidebar"></div>
+              <p id="combat-resonance-sidebar-empty" class="quiet-copy">No group has reached Resonance.</p>
+            </section>
+            <section class="combat-sidebar-panel">
+              <p class="eyebrow">PASSIVE TRACKER</p><h2>Combat passives</h2>
+              <p id="combat-passive-filter-note" class="quiet-copy" hidden>Showing active passives only · change in Settings.</p>
+              <div id="combat-passive-sidebar" class="combat-sidebar-passives"></div>
+              <p id="combat-passive-sidebar-empty" class="quiet-copy" hidden>No passives match this view.</p>
+            </section>
+            <button id="combat-reset-encounter" class="button button-danger-quiet" type="button">Reset encounter</button>
+          </aside>
+        </div>
+        <p class="combat-caveat">Initiative is rolled from each combatant's Speed range at the start of every round. Identity HP is Base Health + HP growth × Level. Clashes break one losing Coin at a time; cracked Unbreakable Coins attack for half damage. Concentration shield equals at least 1, based on a rerolled Coin's power.</p>
       </section>
+
+        <datalist id="combat-group-options">
+          <option value="Group 1"></option>
+          <option value="Group 2"></option>
+          <option value="Group 3"></option>
+          <option value="Group 4"></option>
+        </datalist>
+        <template id="combatant-template">
+          <article class="combatant-card">
+            <header class="combatant-heading">
+              <label class="combatant-name-label">Combatant name<input data-field="name" maxlength="60" required></label>
+              <span class="combat-initiative" data-view="initiative">SPD —</span>
+              <button class="button button-danger-quiet" type="button" data-action="remove">Remove</button>
+          </header>
+          <section class="combat-vitals" aria-label="Hit points and stagger">
+            <div class="combat-hp-heading">
+              <strong>HP</strong>
+              <span class="combat-shield" data-view="shield">Shield 0</span>
+              <div class="combat-hp-values">
+                <label><span class="sr-only">Current HP</span><input data-field="currentHp" type="number" min="0" step="1" value="100" aria-label="Current HP"></label>
+                <span>/</span>
+                <label><span class="sr-only">Maximum HP</span><input data-field="maxHp" type="number" min="1" step="1" value="100" aria-label="Maximum HP"></label>
+              </div>
+            </div>
+            <div class="combat-hp-track" role="progressbar" aria-label="Hit points" aria-valuemin="0">
+              <div class="combat-hp-fill" data-view="hp-fill"></div>
+              <div class="combat-stagger-markers" data-view="stagger-markers"></div>
+            </div>
+            <div class="combat-stagger-status">
+              <strong data-view="stagger-level">Not staggered</strong>
+              <label class="combat-threshold-control">Stagger thresholds (%)<input data-field="staggerThresholds" type="text" placeholder="70 / 50 / 30" aria-label="Stagger thresholds in percent"></label>
+            </div>
+          </section>
+          <div class="combatant-controls">
+            <label class="field">Source<select data-field="source"><option value="manual">Manual combatant</option><option value="identity">Identity Archive</option></select></label>
+            <label class="field">Group<input data-field="group" list="combat-group-options" maxlength="40" placeholder="Group 1"></label>
+            <label class="field">Speed range<input data-field="speedRange" maxlength="30" placeholder="e.g. 3–6 or High"></label>
+            <label class="field combat-identity-control" hidden>Identity<select data-field="identity"></select></label>
+            <label class="field combat-identity-control" hidden>Skill<select data-field="skill"></select></label>
+            <label class="field combat-identity-control" hidden>E.G.O<select data-field="ego"></select></label>
+            <label class="field combat-identity-control" data-view="ego-mode-control" hidden>E.G.O mode<select data-field="egoMode"></select></label>
+            <label class="field combat-identity-control" hidden>Sin resistance profile<select data-field="defensiveEgo"></select></label>
+            <div class="combat-pool-controls combat-identity-control" hidden>
+              <button class="button button-quiet" type="button" data-action="draw-skills">Draw 2 skills</button>
+              <span class="quiet-copy" data-view="draw-status">Draw from this identity's weighted skill pool.</span>
+            </div>
+            <div class="combat-drawn-skills" data-view="drawn-skills" hidden></div>
+            <label class="field">Sanity (SP)<input data-field="sanity" type="number" min="-45" max="45" step="1" value="0"></label>
+          </div>
+          <details class="combat-skill-settings">
+            <summary>Skill settings <span>Power, Sin, and damage die</span></summary>
+            <div class="combat-skill-fields">
+              <label class="field">Base power<input data-field="basePower" type="number" min="0" max="100" step="1" value="4"></label>
+              <label class="field">Coin power<input data-field="coinPower" type="number" min="-20" max="20" step="1" value="2"></label>
+              <label class="field">Coins<input data-field="coinCount" type="number" min="0" max="20" step="1" value="2"></label>
+              <div class="coin-type-editor combat-coin-type-editor" data-view="combat-coin-types"></div>
+              <label class="field">Skill type<select data-field="skillType"><option value="">Attack</option><option>Guard</option><option>Evade</option><option>Counter</option></select></label>
+              <label class="field">Sin<select data-field="sin"><option value="">Not set</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option><option>Sinless</option></select></label>
+              <label class="field">Skill rank<select data-field="rank"><option value="1">S1</option><option value="2">S2</option><option value="3">S3</option></select></label>
+              <label class="field">Damage die<select data-field="die"><option value="4">d4</option><option value="6">d6</option><option value="8">d8</option><option value="10">d10</option><option value="12" selected>d12</option><option value="20">d20</option></select></label>
+              <label class="field">Flat damage<input data-field="flatDamage" type="number" min="0" max="100" step="1" value="0"></label>
+            </div>
+          </details>
+          <div class="combatant-actions">
+            <button class="button button-primary" type="button" data-action="use-skill">Use skill</button>
+            <label class="field combat-clash-target-label">Clash target<select data-field="target"></select></label>
+            <button class="button button-quiet" type="button" data-action="clash">Resolve clash</button>
+          </div>
+          <div class="combatant-status">
+            <section class="combat-status-panel"><h3>Owned Sins</h3><div class="combat-sin-ledger" data-view="owned-sins"></div></section>
+            <section class="combat-status-panel"><h3>Passives</h3><div class="combat-passive-list" data-view="passives"></div></section>
+          </div>
+        </article>
+      </template>
 
       <section id="rules-mechanics-page" class="placeholder-page" hidden>
         <div class="settings-heading">
@@ -284,6 +388,7 @@
                 <p>Choose one of the two rolled skills to use for your attack. The unused skill is kept for the next turn.</p>
                 <p>At the end of each subsequent turn:</p>
                 <ol><li>Roll 1d6 to generate a new skill.</li><li>Choose between your two available skills for your next attack.</li><li>Keep the unused skill and repeat the process next turn.</li></ol>
+                <p><strong>Combat Manager:</strong> The draw button uses each skill's Amount as its pool weight, draws up to two different skills, and lets you queue one. A combatant can use one skill per round; after a skill is used, any unused drawn skill is kept and the pool is replenished at the next round.</p>
               </section>
             </article>
             <article id="rule-skills-clashing" class="rule-section">
@@ -292,39 +397,50 @@
                 <p>Every Attack Skill has the following properties:</p>
                 <table><thead><tr><th>Property</th><th>Description</th></tr></thead><tbody>
                   <tr><td>Base / Skill Power</td><td>The skill's starting power before Coin and other modifiers. The archives label this Skill power for Identities and Base power for E.G.O.</td></tr>
-                  <tr><td>Coin Power</td><td>Power added or subtracted when a Coin lands Heads.</td></tr>
+                  <tr><td>Coin Power</td><td>Power added or subtracted when a Coin lands Heads, according to that Coin's type.</td></tr>
                   <tr><td>Coin Count</td><td>The number of Coins used by the skill.</td></tr>
+                  <tr><td>Coin Type</td><td>Each Coin is Normal, Unbreakable, Excision, or Concentration.</td></tr>
                   <tr><td>Damage Type</td><td>Slash, Pierce or Blunt; recorded as the skill Type or Attack type where applicable.</td></tr>
                   <tr><td>Sin Affinity</td><td>The Sin associated with the skill.</td></tr>
                 </tbody></table>
+              </section>
+              <section class="rule-entry"><h3>E.G.O Passive activation</h3>
+                <p>An E.G.O passive becomes permanently active for its Character after that Character uses a skill from the E.G.O once. An E.G.O record can instead be marked Always active. Both states persist when the E.G.O is unequipped and bypass its normal Threadspin unlock check; passives with Sin requirements can still become active from those requirements before either permanent state applies.</p>
+              </section>
+              <section class="rule-entry"><h3>E.G.O equipment and Threadspin</h3>
+                <p>Each managed Character may equip at most one owned E.G.O of each risk level. A Character's equipped E.G.O skills are available to all of its Identity-backed combatants only when the skill's recorded Threadspin tier is at or below the equipped Threadspin. An E.G.O passive is listed only when its recorded unlock tier is met. These are archive and Combat Manager rules; they do not model E.G.O effects beyond recorded skill costs, skills, resistances, and passive highlighting.</p>
               </section>
               <section class="rule-entry"><h3>Resolving Coins</h3>
                 <p>Roll <strong>1d4 once for each Coin</strong> in your selected skill. The result determines whether that Coin lands Heads or Tails, depending on your Sanity.</p>
                 <table><thead><tr><th>Sanity</th><th>Tails</th><th>Heads</th></tr></thead><tbody>
                   <tr><td>0</td><td>1–2</td><td>3–4</td></tr><tr><td>+25 or higher</td><td>1</td><td>2–4</td></tr><tr><td>−25 or lower</td><td>1–3</td><td>4</td></tr>
                 </tbody></table>
-                <ul><li><strong>Heads:</strong> Apply the Coin's Coin Power to the skill.</li><li><strong>Tails:</strong> Do not modify the skill's Base Power.</li></ul>
-                <p>Calculate your final Clash Power using the Base Power and the results of all Coins.</p>
+                <ul><li><strong>Heads:</strong> Adds the Coin Power.</li><li><strong>Tails:</strong> Does not modify the skill's Base Power.</li></ul>
+                <p>When using all Coins together, their power changes are cumulative. During a Clash, compare Base Power plus the active Coin's change each round.</p>
                 <p class="rule-caveat">Sanity values between the specified thresholds do not yet have a defined d4 conversion.</p>
               </section>
               <section class="rule-entry"><h3>Resolving Clashes</h3>
                 <p>A Clash occurs when two opposing Attack Skills target one another.</p>
-                <ol><li>Both participants roll their Coins.</li><li>Calculate both skills' final Clash Power.</li><li>Compare the two results.</li><li>The participant with the higher number wins the Clash.</li><li>The winner rolls damage and resolves the effects described in their skill.</li></ol>
+                <p>Guard and Counter skills participate in a Clash only when marked Clashable on the Identity. Manual Guard or Counter actions are not Clashable.</p>
+                <ol><li>Both participants roll their last available Coin; compare Base Power plus that Coin's result.</li><li>The lower result loses that Coin. Normal Coins break; Unbreakable and Concentration Coins crack unless the winner used Excision.</li><li>Repeat while both skills have unbroken Coins. A tie stops the Clash without an attack.</li><li>The winner attacks with every unbroken or cracked Coin left. Each remaining Coin deals the skill's rank in damage dice; cracked Coins deal half their damage, rounded down.</li></ol>
+                <p><strong>Unbreakable</strong> Coins crack instead of breaking and remain available for the attack at half damage. <strong>Excision</strong> Coins break an Unbreakable or Concentration Coin when they win against it. <strong>Concentration</strong> Coins are Unbreakable, automatically crit when cracked, and grant shield equal to at least 1 based on a rerolled Coin's power (Base Power plus its Coin change).</p>
                 <p>A skill that does not enter a Clash performs a <strong>one-sided attack</strong>, resolving its damage and effects without opposition.</p>
               </section>
               <section class="rule-entry"><h3>Offense Level</h3>
                 <p>Offense Level provides the <strong>+X damage bonus</strong>.</p>
                 <p>A difference of 5 Offense Levels may also provide 1 additional Clash Power in favour of the character with the higher value. This interaction is provisional and requires further testing.</p>
+                <p class="rule-caveat">The archive has no Offense Level field, so the Combat Manager does not currently calculate this bonus. Skill Flat Damage is separate and applies only when explicitly recorded on that skill.</p>
               </section>
             </article>
             <article id="rule-damage-resistances" class="rule-section">
               <h2>3. Damage and Resistances</h2>
               <section class="rule-entry"><h3>Damage</h3>
-                <p>Damage is rolled separately from Clash and Coin results. The default number of damage dice depends on the skill:</p>
+                <p>Damage is rolled separately from Clash and Coin results. Each Coin remaining after a Clash attacks; each attack rolls the skill's rank in damage dice:</p>
                 <table><thead><tr><th>Skill</th><th>Damage Roll</th></tr></thead><tbody><tr><td>S1</td><td>1dX</td></tr><tr><td>S2</td><td>2dX</td></tr><tr><td>S3</td><td>3dX</td></tr></tbody></table>
                 <p>The damage die (<strong>X</strong>) is determined primarily by the character's weapon. Use D&amp;D weapon damage as a general reference.</p>
                 <p><strong>Example:</strong> Knight Carmilla uses a greatsword, so she deals d12 damage.</p>
                 <p><strong>Important:</strong> Clash Power does not increase damage. Effects that increase Coin Power or Clash Power only improve clashing unless they explicitly state otherwise.</p>
+                <p><strong>Identity Defense modifier (app rule):</strong> The Combat Manager subtracts the signed Defense modifier from rolled damage before applying resistance multipliers, with damage floored at zero. This is a provisional app rule because the reference material does not define a Defense modifier formula.</p>
               </section>
               <section class="rule-entry"><h3>Damage Types and Resistances</h3>
                 <p>Every attack has a physical damage type:</p>
@@ -365,9 +481,9 @@
             <article id="rule-speed" class="rule-section">
               <h2>6. Speed</h2>
               <section class="rule-entry"><h3>Speed Rolls and Effects</h3>
-                <p>Speed determines turn order and influences targeting. Faster characters generally act first and can intercept attacks targeting allies.</p>
+                <p>At the start of each round, the Combat Manager rolls one initiative result inside each combatant's Speed range and orders combatants from highest to lowest. Identity-backed combatants use the selected Identity's range; manual combatants can enter a numeric range such as 3–6 or High, Mid, or Low.</p>
                 <table><thead><tr><th>Category</th><th>Roll</th><th>Result</th></tr></thead><tbody><tr><td>High</td><td>1d8, reroll 1s</td><td>2–8</td></tr><tr><td>Mid</td><td>1d6</td><td>1–6</td></tr><tr><td>Low</td><td>1d6, halve and round up</td><td>1–3</td></tr></tbody></table>
-                <p>The Identity Archive stores each Identity's Speed range as free text; High/Mid/Low are categories used by these table rules.</p>
+                <p>High uses 2–8, Mid uses 1–6, and Low uses 1–3.</p>
                 <p><strong>Haste</strong> increases Speed by its Count, while <strong>Bind</strong> decreases Speed by its Potency for one turn.</p>
                 <p class="rule-caveat">The Status Effect Archive stores and links descriptions; it does not automatically apply effects or simulate combat.</p>
               </section>
@@ -441,12 +557,26 @@
               <input id="max-level-input" name="maxLevel" type="number" min="1" step="1" required>
             </label>
             <p class="help-copy">This is the highest level allowed for any identity. It defaults to 40 and cannot be set below a saved identity’s level.</p>
+            <label class="field">Flat damage application
+              <select id="flat-damage-mode" name="flatDamageMode">
+                <option value="per-skill">Once per skill</option>
+                <option value="per-die">Once per damage die</option>
+              </select>
+            </label>
+            <label class="settings-checkbox"><input id="combat-active-passives-only" name="combatActivePassivesOnly" type="checkbox"> Show only active passives in the Combat Manager sidebar</label>
+            <section class="combat-access-settings" aria-labelledby="combat-access-heading">
+              <h2 id="combat-access-heading">Combat Manager access</h2>
+              <p class="help-copy">Enter the beta access code to enable the Combat Manager for this browser tab.</p>
+              <label class="field">Beta access code<input id="combat-access-code" type="password" autocomplete="off" spellcheck="false"></label>
+              <button id="unlock-combat-manager" class="button button-quiet" type="button">Unlock Combat Manager</button>
+              <p id="combat-access-status" class="quiet-copy" role="status">Combat Manager is locked.</p>
+            </section>
             <button class="button button-primary" type="submit">Save settings</button>
           </form>
         </section>
         <section class="settings-panel backup-panel">
           <h2>Archive backup</h2>
-          <p>Export or restore all identities, E.G.O, announcers, status effects, characters, and application settings in one JSON file. Importing a backup replaces the current archives and settings.</p>
+          <p>Export or restore all identities, E.G.O, announcers, status effects, characters, the combat encounter, and application settings in one JSON file. Importing a backup replaces the current data and encounter.</p>
           <div class="backup-actions">
             <button id="backup-export-button" class="button button-primary" type="button">Export everything</button>
             <button id="backup-import-button" class="button button-quiet" type="button">Import backup</button>
@@ -454,7 +584,7 @@
           </div>
           <div class="backup-clear-data">
             <h3>Clear local browser data</h3>
-            <p>Delete all archives and application settings saved by this app in this browser. This cannot be undone.</p>
+            <p>Delete all archives, the combat encounter, and application settings saved by this app in this browser. This cannot be undone.</p>
             <button id="clear-local-data-button" class="button button-danger-quiet" type="button">Clear local browser data</button>
           </div>
         </section>
@@ -474,6 +604,11 @@
               <label class="field span-2">Character name <span class="required">*</span><input name="name" required maxlength="120" placeholder="e.g. Yi Sang"></label>
               <label class="field span-2">Affiliation<input name="affiliation" maxlength="180" placeholder="e.g. Limbus Company, former association"></label>
             </div>
+          </section>
+          <section class="form-section">
+            <h3>Equipped E.G.O</h3>
+            <p class="help-copy">Equip at most one owned E.G.O per risk level. Equipped E.G.O skills become available to this character's identities in the Combat Manager.</p>
+            <div id="character-ego-loadout" class="character-ego-loadout"></div>
           </section>
           <section class="form-section">
             <h3>Profile</h3>
@@ -505,7 +640,7 @@
               </label>
               <label class="field">Character <span class="required">*</span><select name="character" required><option value="">Select a character</option></select></label>
               <label class="field">Rarity
-                <select name="rarity"><option value="">Not set</option><option value="N/A">N/A</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="3-walpurgis">3★ Walpurgis</option></select>
+                <select name="rarity"><option value="">Not set</option><option value="1">1★</option><option value="2">2★</option><option value="2-walpurgis">2★ Walpurgis</option><option value="3">3★</option><option value="3-walpurgis">3★ Walpurgis</option></select>
               </label>
               <label class="field span-2">Mirror World / affiliation
                 <input name="mirrorWorld" maxlength="120" placeholder="e.g. World of the WARP Trains">
@@ -532,10 +667,11 @@
               <label class="field">Stagger thresholds<input name="stagger" type="text" placeholder="e.g. 70 / 50 / 30"></label>
               <label class="field">Speed<input name="speed" type="text" maxlength="30" placeholder="e.g. 3–6"></label>
               <label class="field">Defense modifier<input name="defense" type="text" maxlength="20" placeholder="e.g. +0"></label>
-              <label class="field">Slash<select name="slash"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
-              <label class="field">Pierce<select name="pierce"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
-              <label class="field">Blunt<select name="blunt"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Slash<input name="slash" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
+              <label class="field">Pierce<input name="pierce" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
+              <label class="field">Blunt<input name="blunt" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
             </div>
+            <p class="help-copy">Enter a resistance multiplier. The read-only view labels it using the resistance ranges in Rules / Mechanics; the label does not alter combat math.</p>
           </section>
           <section class="form-section">
             <div class="section-title-row"><h3>Skills</h3><button id="add-skill-button" class="text-button" type="button">＋ Add skill</button></div>
@@ -544,7 +680,7 @@
           </section>
           <section class="form-section">
             <div class="section-title-row"><h3>Passives</h3><button id="add-passive-button" class="text-button" type="button">＋ Add passive</button></div>
-            <p class="help-copy">Each passive can have multiple sin requirements. Effects support Markdown and <code>{{Name}}</code> status effect links.</p>
+            <p class="help-copy">Each passive can have multiple Owned or Resonance Sin requirements, which highlight when active in the Combat Manager. Effects support Markdown and <code>{{Name}}</code> status effect links.</p>
             <div id="passive-fields" class="passive-fields"></div>
           </section>
           <section class="form-section">
@@ -640,8 +776,8 @@
             <div class="form-grid">
               <label class="field span-2">E.G.O name <span class="required">*</span><input name="name" required maxlength="140" placeholder="e.g. Dimension Shredder"></label>
               <label class="field">Character <span class="required">*</span><select name="character" required><option value="">Select a character</option></select></label>
-              <label class="field">Risk level<select name="riskLevel" required><option value="">Select level</option><option value="N/A">N/A</option><option>ZAYIN</option><option>TETH</option><option>HE</option><option>WAW</option><option>ALEPH</option></select></label>
-              <label class="field">Sin affinity<select name="sinAffinity" required><option value="">Select affinity</option><option value="N/A">N/A</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
+              <label class="field">Risk level<select name="riskLevel" required><option value="">Select level</option><option>ZAYIN</option><option>TETH</option><option>HE</option><option>WAW</option><option>ALEPH</option></select></label>
+              <label class="field">Sin affinity<select name="sinAffinity" required><option value="">Select affinity</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
               <label class="field">Source abnormality<input name="sourceAbnormality" maxlength="140" placeholder="Optional"></label>
               <label class="field">Release date<input name="releaseDate" type="text" placeholder="N/A or YYYY-MM-DD"></label>
               <label class="field span-2">Acquisition<input name="acquisition" maxlength="180" placeholder="e.g. Extraction, Battle Pass, event"></label>
@@ -671,16 +807,17 @@
           <section class="form-section">
             <h3>Sin resistances</h3>
             <div class="form-grid stat-grid ego-data-grid">
-              <label class="field">Wrath<select data-resistance="Wrath"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
-              <label class="field">Lust<select data-resistance="Lust"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
-              <label class="field">Sloth<select data-resistance="Sloth"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
-              <label class="field">Gluttony<select data-resistance="Gluttony"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
-              <label class="field">Gloom<select data-resistance="Gloom"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
-              <label class="field">Pride<select data-resistance="Pride"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
-              <label class="field">Envy<select data-resistance="Envy"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
-              <label class="field">Angst<select data-resistance="Angst"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
-              <label class="field">Madness<select data-resistance="Madness"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Wrath<input data-resistance="Wrath" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
+              <label class="field">Lust<input data-resistance="Lust" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
+              <label class="field">Sloth<input data-resistance="Sloth" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
+              <label class="field">Gluttony<input data-resistance="Gluttony" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
+              <label class="field">Gloom<input data-resistance="Gloom" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
+              <label class="field">Pride<input data-resistance="Pride" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
+              <label class="field">Envy<input data-resistance="Envy" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
+              <label class="field">Angst<input data-resistance="Angst" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
+              <label class="field">Madness<input data-resistance="Madness" type="number" min="0" step="0.01" placeholder="e.g. 1.5"></label>
             </div>
+            <p class="help-copy">Enter a resistance multiplier. The read-only view labels it using the resistance ranges in Rules / Mechanics; the label does not alter combat math.</p>
           </section>
           <section class="form-section">
             <h3>Quotes</h3>
@@ -699,11 +836,14 @@
             <h3>E.G.O Passive</h3>
             <div class="form-grid">
               <label class="field">Passive name<input name="passiveName" maxlength="120"></label>
-              <label class="field">Unlocked at Threadspin<select name="passiveThreadspin"><option value="">Not set</option><option value="N/A">N/A</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+              <label class="field">Unlocked at Threadspin<select name="passiveThreadspin"><option value="">Not set</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+              <label class="settings-checkbox span-2"><input name="passiveAlwaysActive" type="checkbox"> Always active, even before using this E.G.O</label>
               <label class="field span-2">Activation requirement<input name="passiveRequirement" maxlength="300" placeholder="Optional"></label>
               <label class="field span-2">Effect<textarea name="passiveEffect" rows="3" maxlength="3000"></textarea></label>
             </div>
-            <p class="help-copy">Markdown formatting and <code>{{Name}}</code> status effect links are supported in the read-only view.</p>
+            <div class="section-title-row"><h4 class="subsection-heading">Sin requirements</h4><button id="add-ego-passive-requirement" class="text-button" type="button">＋ Add requirement</button></div>
+            <div id="ego-passive-requirements" class="passive-requirements"></div>
+            <p class="help-copy">After this E.G.O is used once, its passive remains active for the Character. The checkbox activates it without requiring E.G.O use. Sin requirements still highlight passives before activation; passives have no other mechanical effect. Effects support Markdown and <code>{{Name}}</code> status effect links.</p>
           </section>
           <section class="form-section">
             <h3>Archive notes</h3>
@@ -722,16 +862,18 @@
         <legend class="ego-skill-legend">E.G.O Skill</legend>
         <button class="remove-ego-skill" type="button" aria-label="Remove E.G.O skill tier">×</button>
         <div class="form-grid ego-skill-grid">
-          <label class="field">Variant<select data-key="mode"><option value="N/A">N/A</option><option>Awakening</option><option>Corrosion</option></select></label>
-          <label class="field">Threadspin<select data-key="threadspin"><option value="N/A">N/A</option><option>4</option><option>3</option><option>2</option><option>1</option></select></label>
+          <label class="field">Variant<select data-key="mode"><option>Awakening</option><option>Corrosion</option></select></label>
+          <label class="field">Threadspin<select data-key="threadspin"><option>4</option><option>3</option><option>2</option><option>1</option></select></label>
           <label class="field span-2">Skill name<input data-key="name" maxlength="120"></label>
-          <label class="field">Sin affinity<select data-key="sinAffinity"><option value="">Not set</option><option value="N/A">N/A</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
-          <label class="field">Attack type<select data-key="attackType"><option value="">Not set</option><option value="N/A">N/A</option><option>Slash</option><option>Pierce</option><option>Blunt</option></select></label>
+          <label class="field">Sin affinity<select data-key="sinAffinity"><option value="">Not set</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
+          <label class="field">Attack type<select data-key="attackType"><option value="">Not set</option><option>Slash</option><option>Pierce</option><option>Blunt</option></select></label>
           <label class="field">Base power<input data-key="basePower" maxlength="20" placeholder="e.g. 20"></label>
           <label class="field">Coin power<input data-key="coinPower" maxlength="20" placeholder="e.g. + 18"></label>
+          <label class="field">Pool weight<input data-key="amount" type="number" min="0" step="1" value="1"></label>
+          <label class="field">Flat damage<input data-key="flatDamage" type="number" min="0" step="1" value="0"></label>
           <label class="field">Coins<input data-key="coinCount" type="text" inputmode="numeric" placeholder="N/A"></label>
+          <div class="coin-type-editor" data-coin-types hidden></div>
           <label class="field">Attack weight<input data-key="attackWeight" type="text" inputmode="numeric" placeholder="N/A"></label>
-          <label class="field">Offense modifier<input data-key="offenseModifier" maxlength="20" placeholder="e.g. +5"></label>
           <label class="field span-2">Skill effects<textarea data-key="effect" rows="5" maxlength="8000" placeholder="Include skill and coin effects here"></textarea></label>
         </div>
       </fieldset>
@@ -741,17 +883,18 @@
         <legend class="skill-row-legend">Skill</legend>
         <button class="remove-skill" type="button" aria-label="Remove skill">×</button>
         <label>Skill name<input data-key="name" maxlength="100" placeholder="Skill name"></label>
-        <label>Sin<select data-key="sin"><option value="">Not set</option><option value="N/A">N/A</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option><option>Sinless</option></select></label>
-        <label>Type<select data-key="type"><option value="">Not set</option><option value="N/A">N/A</option><option>Slash</option><option>Pierce</option><option>Blunt</option><option>Guard</option><option>Evade</option><option>Counter</option></select></label>
+        <label>Sin<select data-key="sin"><option value="">Not set</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option><option>Sinless</option></select></label>
+        <label>Type<select data-key="type"><option value="">Not set</option><option>Slash</option><option>Pierce</option><option>Blunt</option><option>Guard</option><option>Evade</option><option>Counter</option></select></label>
         <label>Skill power<input data-key="skillPower" maxlength="20" placeholder="e.g. 4"></label>
         <label>Coin power<input data-key="coinPower" maxlength="20" placeholder="e.g. + 3"></label>
         <label>Coins<input data-key="coins" type="text" inputmode="numeric" maxlength="4" placeholder="N/A"></label>
+        <div class="coin-type-editor" data-coin-types hidden></div>
         <div class="skill-advanced">
           <label>Skill level / subskill<input data-key="skillLevel" type="text" maxlength="12" placeholder="e.g. 1 or 1-2"></label>
-          <label>Amount<input data-key="amount" type="text" inputmode="numeric" placeholder="N/A"></label>
+          <label>Pool weight<input data-key="amount" type="number" min="0" step="1" value="1"></label>
           <label>Attack weight<input data-key="attackWeight" type="text" inputmode="numeric" placeholder="N/A"></label>
-          <label>Power modifier<input data-key="powerModifier" maxlength="20" placeholder="e.g. +5"></label>
         </div>
+        <label>Flat damage<input data-key="flatDamage" type="number" min="0" step="1" value="0"></label>
         <label class="clashable-control" hidden><input data-key="clashable" type="checkbox"> Clashable</label>
         <label class="skill-effect">Effect<textarea data-key="effect" rows="2" maxlength="2000" placeholder="Optional effect text"></textarea></label>
       </fieldset>
@@ -768,9 +911,9 @@
     </template>
     <template id="passive-requirement-template">
       <div class="passive-requirement-row">
-        <label>Sin type<select data-requirement-key="sinType"><option value="">Not set</option><option value="N/A">N/A</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
+        <label>Sin type<select data-requirement-key="sinType"><option value="">Not set</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
         <label>Amount<input data-requirement-key="sinAmount" type="text" inputmode="numeric" placeholder="N/A"></label>
-        <label>Owned / Resonance<select data-requirement-key="sinMode"><option value="">Not set</option><option value="N/A">N/A</option><option>Owned</option><option>Resonance</option></select></label>
+        <label>Owned / Resonance<select data-requirement-key="sinMode"><option value="">Not set</option><option>Owned</option><option>Resonance</option></select></label>
         <button class="remove-passive-requirement" type="button" aria-label="Remove sin requirement">×</button>
       </div>
     </template>
