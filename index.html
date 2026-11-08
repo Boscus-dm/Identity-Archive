@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121515">
+    <title>Limbus Company Archives</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <button id="main-menu-button" class="brand" type="button" aria-label="Return to main menu">
+        <span class="brand-mark" aria-hidden="true">LC</span>
+        <span><strong>Limbus Company Archives</strong><small>Character · Identity · E.G.O · Announcer</small></span>
+      </button>
+      <div class="header-actions">
+        <button id="settings-button" class="button button-quiet" type="button">Settings</button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section id="main-menu-page" class="main-menu-page">
+        <div class="menu-heading">
+          <p class="eyebrow">LIMBUS COMPANY · ARCHIVE INDEX</p>
+          <h1>Main Menu</h1>
+          <p class="intro-copy">Choose an archive to view and manage its records.</p>
+        </div>
+        <div class="archive-catalog" aria-label="Available archives">
+          <button class="archive-launch-card" type="button" data-page="archive">
+            <span class="archive-card-icon" aria-hidden="true">◇</span>
+            <span class="archive-card-copy"><span class="archive-card-status">AVAILABLE</span><strong>Identity Archive</strong><span>Create and organize custom identities by character.</span></span>
+            <span class="archive-card-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="archive-launch-card" type="button" data-page="ego-archive">
+            <span class="archive-card-icon" aria-hidden="true">✧</span>
+            <span class="archive-card-copy"><span class="archive-card-status">AVAILABLE</span><strong>E.G.O Archive</strong><span>Create and organize E.G.O, costs, resistances, skills, and passives.</span></span>
+            <span class="archive-card-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="archive-launch-card" type="button" data-page="announcer-archive">
+            <span class="archive-card-icon" aria-hidden="true">♫</span>
+            <span class="archive-card-copy"><span class="archive-card-status">AVAILABLE</span><strong>Announcer Archive</strong><span>Create announcers and record their battle lines by occasion.</span></span>
+            <span class="archive-card-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="archive-launch-card" type="button" data-page="character-manager">
+            <span class="archive-card-icon" aria-hidden="true">♙</span>
+            <span class="archive-card-copy"><span class="archive-card-status">AVAILABLE</span><strong>Character Manager</strong><span>Manage character profiles, lore, identities, E.G.O, announcers, and unique effects.</span></span>
+            <span class="archive-card-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="archive-launch-card" type="button" data-page="status-archive">
+            <span class="archive-card-icon" aria-hidden="true">◈</span>
+            <span class="archive-card-copy"><span class="archive-card-status">AVAILABLE</span><strong>Status Effect Archive</strong><span>Create and organize status effects referenced across archive descriptions.</span></span>
+            <span class="archive-card-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="archive-launch-card is-wip" type="button" data-page="combat-tracker">
+            <span class="archive-card-icon" aria-hidden="true">⚔</span>
+            <span class="archive-card-copy"><span class="archive-card-status">WORK IN PROGRESS</span><strong>Combat Tracker</strong><span>Tools for tracking combat encounters will be added later.</span></span>
+            <span class="archive-card-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="archive-launch-card" type="button" data-page="rules-mechanics">
+            <span class="archive-card-icon" aria-hidden="true">≡</span>
+            <span class="archive-card-copy"><span class="archive-card-status">AVAILABLE</span><strong>Rules / Mechanics</strong><span>Browse and search the combat rules and system-specific mechanics.</span></span>
+            <span class="archive-card-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="archive-launch-card" type="button" data-page="settings">
+            <span class="archive-card-icon" aria-hidden="true">⚙</span>
+            <span class="archive-card-copy"><span class="archive-card-status">APPLICATION</span><strong>Settings</strong><span>Configure preferences that apply across the application.</span></span>
+            <span class="archive-card-arrow" aria-hidden="true">→</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="archive-page" hidden>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">MIRROR WORLDS · IDENTITY INDEX</p>
+          <h1>Identity Archive</h1>
+          <p class="intro-copy">Create custom identities, organize them by character, and keep your records in one place.</p>
+        </div>
+        <div class="archive-intro-actions">
+          <div class="archive-navigation-actions">
+            <button id="archive-menu-button" class="button button-quiet" type="button">← Main Menu</button>
+            <button id="add-button" class="button button-primary" type="button" hidden>＋ Add identity</button>
+          </div>
+          <p class="storage-note"><span class="status-dot"></span> Saved in this browser</p>
+        </div>
+      </section>
+      <section class="workspace" aria-label="Identity archive">
+        <aside class="archive-pane">
+          <div class="pane-heading">
+            <div><h2>Archive</h2><span id="result-count" class="muted">Loading identities…</span></div>
+          </div>
+          <label class="search-box">
+            <span class="sr-only">Search identities</span>
+            <span aria-hidden="true">⌕</span>
+            <input id="search-input" type="search" placeholder="Search names, worlds, tags…" autocomplete="off">
+            <kbd>/</kbd>
+          </label>
+          <div class="filters">
+            <label>Character
+              <select id="character-filter"><option value="">All characters</option></select>
+            </label>
+            <label>Rarity
+              <select id="rarity-filter">
+                <option value="">All rarities</option>
+                <option value="N/A">N/A</option>
+                <option value="1">1★</option><option value="2">2★</option><option value="3">3★</option>
+              </select>
+            </label>
+          </div>
+          <div class="list-toolbar">
+            <span>IDENTITIES</span>
+            <label class="sort-control"><span class="sr-only">Sort identities</span>
+              <select id="sort-filter" aria-label="Sort identities">
+                <option value="character">By character</option>
+                <option value="rarity">Rarity, high to low</option>
+                <option value="name">A–Z</option>
+                <option value="recent">Recently added</option>
+              </select>
+            </label>
+          </div>
+          <div id="identity-list" class="identity-list" role="listbox" aria-label="Identities"></div>
+          <p id="empty-state" class="empty-state" hidden>No identities match these filters.</p>
+        </aside>
+
+        <article id="detail-pane" class="detail-pane" aria-live="polite">
+          <div class="empty-detail">
+            <span class="empty-glyph" aria-hidden="true">◇</span>
+            <h2>Select an identity</h2>
+            <p>Choose a record from the archive or add a new one.</p>
+          </div>
+        </article>
+      </section>
+
+      <footer class="app-footer"><span>Archive entries are managed by you and saved on this device.</span></footer>
+      </section>
+
+      <section id="ego-archive-page" hidden>
+        <section class="intro">
+          <div>
+            <p class="eyebrow">RISK LEVEL · SIN AFFINITY · THREADSPIN</p>
+            <h1>E.G.O Archive</h1>
+            <p class="intro-copy">Create and organize E.G.O records, including Awakening and Corrosion skill tiers.</p>
+          </div>
+          <div class="archive-navigation-actions">
+            <button class="button button-quiet" type="button" data-page="main-menu">← Main Menu</button>
+            <button id="ego-add-button" class="button button-primary" type="button" hidden>＋ Add E.G.O</button>
+          </div>
+        </section>
+        <section class="workspace" aria-label="E.G.O archive">
+          <aside class="archive-pane">
+            <div class="pane-heading"><div><h2>E.G.O</h2><span id="ego-result-count" class="muted">Loading E.G.O…</span></div></div>
+            <label class="search-box"><span class="sr-only">Search E.G.O</span><span aria-hidden="true">⌕</span><input id="ego-search-input" type="search" placeholder="Search names, characters, effects…" autocomplete="off"><kbd>/</kbd></label>
+            <div class="filters">
+              <label>Character<select id="ego-character-filter"><option value="">All characters</option></select></label>
+              <label>Risk level<select id="ego-risk-filter"><option value="">All levels</option><option value="N/A">N/A</option><option>ZAYIN</option><option>TETH</option><option>HE</option><option>WAW</option><option>ALEPH</option></select></label>
+              <label>Sin affinity<select id="ego-affinity-filter"><option value="">All affinities</option><option value="N/A">N/A</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
+            </div>
+            <div class="list-toolbar"><span>E.G.O RECORDS</span><label class="sort-control"><span class="sr-only">Sort E.G.O</span><select id="ego-sort-filter" aria-label="Sort E.G.O"><option value="character">By character</option><option value="risk">By risk level</option><option value="affinity">By sin affinity</option><option value="name">A–Z</option><option value="recent">Recently added</option></select></label></div>
+            <div id="ego-list" class="identity-list" role="listbox" aria-label="E.G.O records"></div>
+            <p id="ego-empty-state" class="empty-state" hidden>No E.G.O records match these filters.</p>
+          </aside>
+          <article id="ego-detail-pane" class="detail-pane" aria-live="polite"><div class="empty-detail"><span class="empty-glyph" aria-hidden="true">✧</span><h2>Select an E.G.O</h2><p>Choose a record or add a new one.</p></div></article>
+        </section>
+        <footer class="app-footer"><span>E.G.O records are saved separately from identities in this browser.</span></footer>
+      </section>
+
+      <section id="announcer-archive-page" hidden>
+        <section class="intro">
+          <div>
+            <p class="eyebrow">BATTLE LINES · OCCASION INDEX</p>
+            <h1>Announcer Archive</h1>
+            <p class="intro-copy">Create announcers and organize their voicelines by the game's battle occasions.</p>
+          </div>
+          <div class="archive-navigation-actions">
+            <button class="button button-quiet" type="button" data-page="main-menu">← Main Menu</button>
+            <button id="announcer-add-button" class="button button-primary" type="button" hidden>＋ Add announcer</button>
+          </div>
+        </section>
+        <section class="workspace" aria-label="Announcer archive">
+          <aside class="archive-pane">
+            <div class="pane-heading"><div><h2>Announcers</h2><span id="announcer-result-count" class="muted">Loading announcers…</span></div></div>
+            <label class="search-box"><span class="sr-only">Search announcers</span><span aria-hidden="true">⌕</span><input id="announcer-search-input" type="search" placeholder="Search names, characters, lines…" autocomplete="off"><kbd>/</kbd></label>
+            <div class="list-toolbar"><span>ANNOUNCERS</span><label class="sort-control"><span class="sr-only">Sort announcers</span><select id="announcer-sort-filter" aria-label="Sort announcers"><option value="name">A–Z</option><option value="recent">Recently updated</option></select></label></div>
+            <div id="announcer-list" class="identity-list" role="listbox" aria-label="Announcers"></div>
+            <p id="announcer-empty-state" class="empty-state" hidden>No announcers match this search.</p>
+          </aside>
+          <article id="announcer-detail-pane" class="detail-pane" aria-live="polite"><div class="empty-detail"><span class="empty-glyph" aria-hidden="true">♫</span><h2>Select an announcer</h2><p>Choose a record or add a new announcer.</p></div></article>
+        </section>
+        <footer class="app-footer"><span>Announcer records are saved separately from identities and E.G.O in this browser.</span></footer>
+      </section>
+
+      <section id="character-manager-page" hidden>
+        <section class="intro">
+          <div>
+            <p class="eyebrow">CHARACTER INDEX · PROFILE ARCHIVE</p>
+            <h1>Character Manager</h1>
+            <p class="intro-copy">Manage characters centrally and review linked identities, E.G.O, announcers, and unique status effects.</p>
+          </div>
+          <div class="archive-navigation-actions">
+            <button class="button button-quiet" type="button" data-page="main-menu">← Main Menu</button>
+            <button id="character-add-button" class="button button-primary" type="button" hidden>＋ Add character</button>
+          </div>
+        </section>
+        <section class="workspace" aria-label="Character manager">
+          <aside class="archive-pane">
+            <div class="pane-heading"><div><h2>Characters</h2><span id="character-result-count" class="muted">Loading characters…</span></div></div>
+            <label class="search-box"><span class="sr-only">Search characters</span><span aria-hidden="true">⌕</span><input id="character-search-input" type="search" placeholder="Search characters and lore…" autocomplete="off"><kbd>/</kbd></label>
+            <div class="list-toolbar"><span>CHARACTERS</span><span class="muted">A–Z</span></div>
+            <div id="character-list" class="identity-list" role="listbox" aria-label="Characters"></div>
+            <p id="character-empty-state" class="empty-state" hidden>No characters match this search.</p>
+          </aside>
+          <article id="character-detail-pane" class="detail-pane" aria-live="polite"><div class="empty-detail"><span class="empty-glyph" aria-hidden="true">♙</span><h2>Select a character</h2><p>Create a character profile or choose one from the list.</p></div></article>
+        </section>
+        <footer class="app-footer"><span>Characters are managed here and referenced by archive records.</span></footer>
+      </section>
+
+      <section id="status-archive-page" hidden>
+        <section class="intro">
+          <div>
+            <p class="eyebrow">EFFECT INDEX · CROSS-REFERENCES</p>
+            <h1>Status Effect Archive</h1>
+            <p class="intro-copy">Create status effects and link to them from Markdown with <code>{{Name}}</code>.</p>
+          </div>
+          <div class="archive-navigation-actions">
+            <button class="button button-quiet" type="button" data-page="main-menu">← Main Menu</button>
+            <button id="status-effect-add-button" class="button button-primary" type="button" hidden>＋ Add status effect</button>
+          </div>
+        </section>
+        <section class="workspace" aria-label="Status effect archive">
+          <aside class="archive-pane">
+            <div class="pane-heading"><div><h2>Status Effects</h2><span id="status-effect-result-count" class="muted">Loading status effects…</span></div></div>
+            <label class="search-box"><span class="sr-only">Search status effects</span><span aria-hidden="true">⌕</span><input id="status-effect-search-input" type="search" placeholder="Search names, identifiers, effects…" autocomplete="off"><kbd>/</kbd></label>
+            <div class="list-toolbar"><span>STATUS EFFECTS</span><label class="sort-control"><span class="sr-only">Sort status effects</span><select id="status-effect-sort-filter" aria-label="Sort status effects"><option value="name">A–Z</option><option value="recent">Recently updated</option></select></label></div>
+            <div id="status-effect-list" class="identity-list" role="listbox" aria-label="Status effects"></div>
+            <p id="status-effect-empty-state" class="empty-state" hidden>No status effects match this search.</p>
+          </aside>
+          <article id="status-effect-detail-pane" class="detail-pane" aria-live="polite"><div class="empty-detail"><span class="empty-glyph" aria-hidden="true">◈</span><h2>Select a status effect</h2><p>Choose a record or add a new status effect.</p></div></article>
+        </section>
+        <footer class="app-footer"><span>Status effects are saved separately from identities, E.G.O, and announcers in this browser.</span></footer>
+      </section>
+
+      <section id="combat-tracker-page" class="placeholder-page" hidden>
+        <div class="settings-heading">
+          <div><p class="eyebrow">LIMBUS COMPANY · TOOLS</p><h1>Combat Tracker</h1></div>
+          <button class="button button-quiet" type="button" data-page="main-menu">← Main Menu</button>
+        </div>
+        <section class="wip-panel"><span class="wip-label">WORK IN PROGRESS</span><h2>This tool is not ready yet</h2><p>The Combat Tracker will be added in a future update.</p></section>
+      </section>
+
+      <section id="rules-mechanics-page" class="placeholder-page" hidden>
+        <div class="settings-heading">
+          <div><p class="eyebrow">LIMBUS COMPANY · REFERENCE</p><h1>Rules / Mechanics</h1></div>
+          <button class="button button-quiet" type="button" data-page="main-menu">← Main Menu</button>
+        </div>
+        <p class="rules-reference-intro">Unless explicitly stated otherwise, these mechanics follow Limbus Company. This reference documents system-specific changes and additions.</p>
+        <div class="rules-search-layout">
+          <aside class="rules-sidebar">
+            <label class="search-box rules-search-box"><span class="sr-only">Search rules and mechanics</span><span aria-hidden="true">⌕</span>
+              <input id="rules-search-input" type="search" placeholder="Search rules…" autocomplete="off">
+            </label>
+            <p id="rules-search-results" class="rules-search-results" aria-live="polite"></p>
+            <nav class="rules-index" aria-label="Rule sections">
+              <a href="#rule-turn-structure" data-rule-nav="rule-turn-structure">1. Turn Structure</a>
+              <a href="#rule-skills-clashing" data-rule-nav="rule-skills-clashing">2. Skills and Clashing</a>
+              <a href="#rule-damage-resistances" data-rule-nav="rule-damage-resistances">3. Damage and Resistances</a>
+              <a href="#rule-sins" data-rule-nav="rule-sins">4. Sins</a>
+              <a href="#rule-sanity" data-rule-nav="rule-sanity">5. Sanity (SP)</a>
+              <a href="#rule-speed" data-rule-nav="rule-speed">6. Speed</a>
+              <a href="#rule-defensive-skills" data-rule-nav="rule-defensive-skills">7. Defensive Skills</a>
+              <a href="#rule-stagger" data-rule-nav="rule-stagger">8. Stagger</a>
+              <a href="#rule-critical-poise" data-rule-nav="rule-critical-poise">9. Critical Hits and Poise</a>
+            </nav>
+          </aside>
+          <div id="rules-reference" class="rules-reference">
+            <p id="rules-no-results" class="empty-state" hidden>No rule topics match this search.</p>
+            <article id="rule-turn-structure" class="rule-section">
+              <h2>1. Turn Structure</h2>
+              <section class="rule-entry"><h3>Selecting Skills</h3>
+                <p>Characters have three Attack Skills: S1, S2 and S3.</p>
+                <p>The turn rules assume those three skills, while the Identity Archive allows any number of skill rows and the E.G.O Archive records Awakening/Corrosion variants by Threadspin.</p>
+                <p>At the beginning of the first turn, roll <strong>1d6 twice</strong> to determine your available skills.</p>
+                <table><thead><tr><th>Roll</th><th>Skill</th></tr></thead><tbody><tr><td>1–3</td><td>S1</td></tr><tr><td>4–5</td><td>S2</td></tr><tr><td>6</td><td>S3</td></tr></tbody></table>
+                <p>Choose one of the two rolled skills to use for your attack. The unused skill is kept for the next turn.</p>
+                <p>At the end of each subsequent turn:</p>
+                <ol><li>Roll 1d6 to generate a new skill.</li><li>Choose between your two available skills for your next attack.</li><li>Keep the unused skill and repeat the process next turn.</li></ol>
+              </section>
+            </article>
+            <article id="rule-skills-clashing" class="rule-section">
+              <h2>2. Skills and Clashing</h2>
+              <section class="rule-entry"><h3>Skill Properties</h3>
+                <p>Every Attack Skill has the following properties:</p>
+                <table><thead><tr><th>Property</th><th>Description</th></tr></thead><tbody>
+                  <tr><td>Base / Skill Power</td><td>The skill's starting power before Coin and other modifiers. The archives label this Skill power for Identities and Base power for E.G.O.</td></tr>
+                  <tr><td>Coin Power</td><td>Power added or subtracted when a Coin lands Heads.</td></tr>
+                  <tr><td>Coin Count</td><td>The number of Coins used by the skill.</td></tr>
+                  <tr><td>Damage Type</td><td>Slash, Pierce or Blunt; recorded as the skill Type or Attack type where applicable.</td></tr>
+                  <tr><td>Sin Affinity</td><td>The Sin associated with the skill.</td></tr>
+                </tbody></table>
+              </section>
+              <section class="rule-entry"><h3>Resolving Coins</h3>
+                <p>Roll <strong>1d4 once for each Coin</strong> in your selected skill. The result determines whether that Coin lands Heads or Tails, depending on your Sanity.</p>
+                <table><thead><tr><th>Sanity</th><th>Tails</th><th>Heads</th></tr></thead><tbody>
+                  <tr><td>0</td><td>1–2</td><td>3–4</td></tr><tr><td>+25 or higher</td><td>1</td><td>2–4</td></tr><tr><td>−25 or lower</td><td>1–3</td><td>4</td></tr>
+                </tbody></table>
+                <ul><li><strong>Heads:</strong> Apply the Coin's Coin Power to the skill.</li><li><strong>Tails:</strong> Do not modify the skill's Base Power.</li></ul>
+                <p>Calculate your final Clash Power using the Base Power and the results of all Coins.</p>
+                <p class="rule-caveat">Sanity values between the specified thresholds do not yet have a defined d4 conversion.</p>
+              </section>
+              <section class="rule-entry"><h3>Resolving Clashes</h3>
+                <p>A Clash occurs when two opposing Attack Skills target one another.</p>
+                <ol><li>Both participants roll their Coins.</li><li>Calculate both skills' final Clash Power.</li><li>Compare the two results.</li><li>The participant with the higher number wins the Clash.</li><li>The winner rolls damage and resolves the effects described in their skill.</li></ol>
+                <p>A skill that does not enter a Clash performs a <strong>one-sided attack</strong>, resolving its damage and effects without opposition.</p>
+              </section>
+              <section class="rule-entry"><h3>Offense Level</h3>
+                <p>Offense Level provides the <strong>+X damage bonus</strong>.</p>
+                <p>A difference of 5 Offense Levels may also provide 1 additional Clash Power in favour of the character with the higher value. This interaction is provisional and requires further testing.</p>
+              </section>
+            </article>
+            <article id="rule-damage-resistances" class="rule-section">
+              <h2>3. Damage and Resistances</h2>
+              <section class="rule-entry"><h3>Damage</h3>
+                <p>Damage is rolled separately from Clash and Coin results. The default number of damage dice depends on the skill:</p>
+                <table><thead><tr><th>Skill</th><th>Damage Roll</th></tr></thead><tbody><tr><td>S1</td><td>1dX</td></tr><tr><td>S2</td><td>2dX</td></tr><tr><td>S3</td><td>3dX</td></tr></tbody></table>
+                <p>The damage die (<strong>X</strong>) is determined primarily by the character's weapon. Use D&amp;D weapon damage as a general reference.</p>
+                <p><strong>Example:</strong> Knight Carmilla uses a greatsword, so she deals d12 damage.</p>
+                <p><strong>Important:</strong> Clash Power does not increase damage. Effects that increase Coin Power or Clash Power only improve clashing unless they explicitly state otherwise.</p>
+              </section>
+              <section class="rule-entry"><h3>Damage Types and Resistances</h3>
+                <p>Every attack has a physical damage type:</p>
+                <table><thead><tr><th>Type</th><th>Description</th></tr></thead><tbody><tr><td>Slash</td><td>Cutting and slashing attacks.</td></tr><tr><td>Pierce</td><td>Stabbing and piercing attacks.</td></tr><tr><td>Blunt</td><td>Crushing and blunt-force attacks.</td></tr></tbody></table>
+                <p>Both physical and Sin Resistance multipliers apply to incoming damage. In this app, physical resistance categories are recorded on Identity records and Sin resistance categories on E.G.O records. The same resistance categories are used for both:</p>
+                <table><thead><tr><th>Name</th><th>Value (Mathematical intervals)</th></tr></thead><tbody>
+                  <tr><td>Fatal</td><td>(x1.5, x2]</td></tr><tr><td>Weak</td><td>(x1, x1.5]</td></tr><tr><td>Normal</td><td>[x1]</td></tr><tr><td>Endure</td><td>[x0.75, x1)</td></tr><tr><td>Ineffective (Ineff.)</td><td>(x0, x0.75)</td></tr><tr><td>Immune</td><td>[x0]</td></tr>
+                </tbody></table>
+              </section>
+            </article>
+            <article id="rule-sins" class="rule-section">
+              <h2>4. Sins</h2>
+              <section class="rule-entry"><h3>Sin Affinities</h3>
+                <p>Attack Skills normally have a Sin Affinity. Sins determine damage interactions, E.G.O resource generation and Resonance; the Identity and E.G.O archives also allow N/A or Sinless where appropriate. There are nine Sins in this system:</p>
+                <table><thead><tr><th>Sin</th><th>Colour</th><th>Default Resistance</th></tr></thead><tbody>
+                  <tr><td>Wrath</td><td>Red</td><td>Set per E.G.O</td></tr><tr><td>Lust</td><td>Orange</td><td>Set per E.G.O</td></tr><tr><td>Sloth</td><td>Yellow</td><td>Set per E.G.O</td></tr><tr><td>Gluttony</td><td>Green</td><td>Set per E.G.O</td></tr><tr><td>Gloom</td><td>Cyan</td><td>Set per E.G.O</td></tr><tr><td>Pride</td><td>Blue</td><td>Set per E.G.O</td></tr><tr><td>Envy</td><td>Purple</td><td>Set per E.G.O</td></tr><tr><td>Angst</td><td>Black</td><td>Fatal by default</td></tr><tr><td>Madness</td><td>White</td><td>Fatal by default</td></tr>
+                </tbody></table>
+                <p>Angst and Madness are system-specific additions, not Limbus Company Sins. They are included in the Identity and E.G.O archives for later material (Purgatorio or beyond); their E.G.O Sin Resistance defaults to Fatal and can be changed.</p>
+              </section>
+              <section class="rule-entry"><h3>Sin Resources</h3>
+                <p>Using an Attack Skill generates E.G.O Resources matching its Sin Affinity; N/A or Sinless skills generate no Sin resource.</p>
+                <p>These resources are spent to activate E.G.Os, each of which has its own resource requirements.</p>
+              </section>
+              <section class="rule-entry"><h3>Sin Resonance</h3>
+                <p>Resonance occurs when two or more skills of the same Sin Affinity are selected during the same turn; they do not have to be adjacent. Limbus Company boosts Offense/Defense Level by chain position; this system instead grants increasing Power bonuses to matching skills.</p>
+                <ul><li><strong>Resonance:</strong> Two or more selected skills share the same Sin Affinity.</li><li><strong>Absolute Resonance:</strong> Three or more skills with the same Sin Affinity are directly adjacent in the speed-ordered skill chain. This provides a stronger bonus.</li></ul>
+                <p>Resonance can also activate effects that specifically require a certain number of matching Sins.</p>
+              </section>
+            </article>
+            <article id="rule-sanity" class="rule-section">
+              <h2>5. Sanity (SP)</h2>
+              <section class="rule-entry"><h3>Sanity</h3>
+                <p>Sanity influences the probability of rolling Heads on Coins. Sanity ranges from <strong>−45 to +45</strong>. Its exact d4 conversion is described in the <a href="#rule-skills-clashing">Resolving Coins</a> rules.</p>
+                <p>Sanity typically increases through:</p><ul><li>Winning Clashes.</li><li>Defeating enemies.</li></ul>
+                <p>Sanity typically decreases through:</p><ul><li>Using E.G.O.</li><li>Losing allies.</li><li>Certain status effects and abilities.</li></ul>
+              </section>
+            </article>
+            <article id="rule-speed" class="rule-section">
+              <h2>6. Speed</h2>
+              <section class="rule-entry"><h3>Speed Rolls and Effects</h3>
+                <p>Speed determines turn order and influences targeting. Faster characters generally act first and can intercept attacks targeting allies.</p>
+                <table><thead><tr><th>Category</th><th>Roll</th><th>Result</th></tr></thead><tbody><tr><td>High</td><td>1d8, reroll 1s</td><td>2–8</td></tr><tr><td>Mid</td><td>1d6</td><td>1–6</td></tr><tr><td>Low</td><td>1d6, halve and round up</td><td>1–3</td></tr></tbody></table>
+                <p>The Identity Archive stores each Identity's Speed range as free text; High/Mid/Low are categories used by these table rules.</p>
+                <p><strong>Haste</strong> increases Speed by its Count, while <strong>Bind</strong> decreases Speed by its Potency for one turn.</p>
+                <p class="rule-caveat">The Status Effect Archive stores and links descriptions; it does not automatically apply effects or simulate combat.</p>
+              </section>
+            </article>
+            <article id="rule-defensive-skills" class="rule-section">
+              <h2>7. Defensive Skills</h2>
+              <section class="rule-entry"><h3>Guard, Evade, and Counter</h3>
+                <p>There are three standard defensive actions:</p>
+                <table><thead><tr><th>Skill</th><th>Effect</th></tr></thead><tbody><tr><td>Guard</td><td>Generates Shield to absorb incoming damage.</td></tr><tr><td>Evade</td><td>Attempts to avoid incoming attacks using a defensive roll.</td></tr><tr><td>Counter</td><td>Performs a retaliatory attack when triggered by an incoming attack.</td></tr></tbody></table>
+                <p><strong>Guard:</strong> Shield absorbs damage before HP. Damage absorbed by Shield does not trigger Stagger thresholds.</p>
+                <p><strong>Evade:</strong> Successfully evading prevents the incoming attack from dealing damage.</p>
+                <p><strong>Counter:</strong> Performs a retaliatory attack. It does not generally prevent the incoming attack from dealing damage.</p>
+                <p>Individual skills may modify these effects.</p>
+              </section>
+            </article>
+            <article id="rule-stagger" class="rule-section">
+              <h2>8. Stagger</h2>
+              <section class="rule-entry"><h3>Stagger Effects</h3>
+                <p>Stagger occurs when HP damage crosses one or more Stagger Thresholds while no Shield remains. Threshold percentages are recorded individually on each Identity.</p>
+                <p>Staggered characters:</p><ul><li>Cannot use skills for the remainder of the current turn and the entirety of the following turn.</li><li>Have their physical Resistances changed to Fatal.</li><li>Become significantly more vulnerable to incoming damage.</li></ul>
+              </section>
+              <section class="rule-entry"><h3>Stagger Levels</h3>
+                <p>Crossing multiple Stagger Thresholds increases the Stagger level and its damage multiplier.</p>
+                <table><thead><tr><th>Stagger Level</th><th>Physical Damage Taken</th></tr></thead><tbody><tr><td>Stagger</td><td>2x</td></tr><tr><td>Stagger+</td><td>2.5x</td></tr><tr><td>Stagger++</td><td>3x</td></tr></tbody></table>
+                <p>These multipliers replace normal physical Resistance while Staggered. Sin Resistance still applies separately.</p>
+                <p>The maximum Stagger level is Stagger++.</p>
+              </section>
+              <section class="rule-entry"><h3>Stagger Thresholds</h3>
+                <p>Thresholds are expressed as percentages of maximum HP. The Identity Archive stores the exact percentages recorded for each Identity; these High/Mid/Low rows are reference patterns, not archive categories.</p>
+                <table><thead><tr><th>Category</th><th>Stagger</th><th>Stagger+</th><th>Stagger++</th></tr></thead><tbody><tr><td>High</td><td>40%</td><td>10%</td><td>—</td></tr><tr><td>Mid</td><td>70%</td><td>40%</td><td>20%</td></tr><tr><td>Low</td><td>65%</td><td>35%</td><td>15%</td></tr></tbody></table>
+              </section>
+            </article>
+            <article id="rule-critical-poise" class="rule-section">
+              <h2>9. Critical Hits and Poise</h2>
+              <section class="rule-entry"><h3>Critical Hits</h3>
+                <p>A damage die that rolls its <strong>maximum possible value</strong> scores a critical hit, doubling that die's damage. Poise can expand the critical range; these table rules replace Limbus Company's standard critical damage modifier.</p>
+                <p><strong>Example:</strong> Rolling an 8 on a d8 deals 16 damage instead of 8.</p>
+              </section>
+              <section class="rule-entry"><h3>Poise Thresholds</h3>
+                <p>Poise expands your critical hit range based on its current value.</p>
+                <table><thead><tr><th>Poise</th><th>Critical Range</th><th>d8 Example</th></tr></thead><tbody><tr><td>0</td><td>Maximum result only</td><td>8</td></tr><tr><td>5</td><td>Top 25%</td><td>7+</td></tr><tr><td>10</td><td>Top 50%</td><td>5+</td></tr><tr><td>15</td><td>Top 75%</td><td>3+</td></tr><tr><td>20</td><td>Always critical</td><td>Any result</td></tr></tbody></table>
+              </section>
+              <section class="rule-entry"><h3>Poise Count Consumption</h3>
+                <p>When you score a critical hit using Poise, consume Poise Count equal to the number of damage dice on the skill.</p>
+                <table><thead><tr><th>Skill</th><th>Damage Dice</th><th>Poise Count Consumed</th></tr></thead><tbody><tr><td>S1</td><td>1</td><td>1</td></tr><tr><td>S2</td><td>2</td><td>2</td></tr><tr><td>S3</td><td>3</td><td>3</td></tr></tbody></table>
+                <p><strong>Example:</strong> An S3 dealing 3d8 damage consumes 3 Poise Count when it scores a Poise-enabled critical hit.</p>
+                <p class="rule-caveat">This is the current table rule for Poise consumption.</p>
+              </section>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="settings-page" hidden>
+        <div class="settings-heading">
+          <div><p class="eyebrow">APPLICATION PREFERENCES</p><h1>Settings</h1></div>
+          <button id="back-to-previous-page" class="button button-quiet" type="button">← Back</button>
+        </div>
+        <section class="settings-panel">
+          <form id="settings-form">
+            <label class="field">Application theme
+              <select id="theme-select" name="theme">
+                <option value="minimalist-dark">Minimalist Dark</option>
+                <option value="minimalist-light">Minimalist Light</option>
+                <option value="persona-5">Persona 5</option>
+                <option value="limbus-wiki">Limbus Company Wiki</option>
+                <option value="cyberpunk-2077">Cyberpunk 2077</option>
+              </select>
+            </label>
+            <label class="field">Maximum identity level
+              <input id="max-level-input" name="maxLevel" type="number" min="1" step="1" required>
+            </label>
+            <p class="help-copy">This is the highest level allowed for any identity. It defaults to 40 and cannot be set below a saved identity’s level.</p>
+            <button class="button button-primary" type="submit">Save settings</button>
+          </form>
+        </section>
+        <section class="settings-panel backup-panel">
+          <h2>Archive backup</h2>
+          <p>Export or restore all identities, E.G.O, announcers, status effects, characters, and application settings in one JSON file. Importing a backup replaces the current archives and settings.</p>
+          <div class="backup-actions">
+            <button id="backup-export-button" class="button button-primary" type="button">Export everything</button>
+            <button id="backup-import-button" class="button button-quiet" type="button">Import backup</button>
+            <input id="backup-import-file" type="file" accept="application/json,.json" hidden>
+          </div>
+          <div class="backup-clear-data">
+            <h3>Clear local browser data</h3>
+            <p>Delete all archives and application settings saved by this app in this browser. This cannot be undone.</p>
+            <button id="clear-local-data-button" class="button button-danger-quiet" type="button">Clear local browser data</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="character-dialog" class="identity-dialog">
+      <form id="character-form" method="dialog">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">CHARACTER PROFILE</p><h2 id="character-dialog-title">Add character</h2></div>
+          <button id="close-character-dialog" class="icon-button" type="button" aria-label="Close character form">×</button>
+        </div>
+        <div class="form-scroll">
+          <section class="form-section">
+            <h3>Identity</h3>
+            <div class="form-grid">
+              <label class="field span-2">Character name <span class="required">*</span><input name="name" required maxlength="120" placeholder="e.g. Yi Sang"></label>
+              <label class="field span-2">Affiliation<input name="affiliation" maxlength="180" placeholder="e.g. Limbus Company, former association"></label>
+            </div>
+          </section>
+          <section class="form-section">
+            <h3>Profile</h3>
+            <label class="field">Introduction<textarea name="introduction" rows="3" maxlength="6000" placeholder="A short profile summary"></textarea></label>
+            <label class="field">Personality<textarea name="personality" rows="4" maxlength="8000"></textarea></label>
+            <label class="field">History<textarea name="history" rows="5" maxlength="12000"></textarea></label>
+            <label class="field">Relationships<textarea name="relationships" rows="4" maxlength="8000"></textarea></label>
+            <label class="field">Trivia<textarea name="trivia" rows="3" maxlength="6000"></textarea></label>
+            <label class="field">Notes<textarea name="notes" rows="3" maxlength="6000"></textarea></label>
+            <p class="help-copy">Lore fields support Markdown and status effect links in the profile view.</p>
+          </section>
+        </div>
+        <div class="dialog-actions"><button id="cancel-character-dialog" class="button button-quiet" type="button">Cancel</button><button class="button button-primary" type="submit">Save character</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="identity-dialog" class="identity-dialog">
+      <form id="identity-form" method="dialog">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">IDENTITY RECORD</p><h2 id="dialog-title">Add identity</h2></div>
+          <button id="close-dialog" class="icon-button" type="button" aria-label="Close form">×</button>
+        </div>
+        <div class="form-scroll">
+          <section class="form-section">
+            <h3>Identity</h3>
+            <div class="form-grid">
+              <label class="field span-2">Identity name <span class="required">*</span>
+                <input name="name" required maxlength="140" placeholder="e.g. W Corp. L3 Cleanup Agent">
+              </label>
+              <label class="field">Character <span class="required">*</span><select name="character" required><option value="">Select a character</option></select></label>
+              <label class="field">Rarity
+                <select name="rarity"><option value="">Not set</option><option value="N/A">N/A</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="3-walpurgis">3★ Walpurgis</option></select>
+              </label>
+              <label class="field span-2">Mirror World / affiliation
+                <input name="mirrorWorld" maxlength="120" placeholder="e.g. World of the WARP Trains">
+              </label>
+              <label class="field">Prefix / faction<input name="prefix" maxlength="120"></label>
+              <label class="field">Release date<input name="releaseDate" type="text" placeholder="N/A or YYYY-MM-DD"></label>
+            </div>
+            <p class="help-copy">Create and edit character profiles in the Character Manager.</p>
+          </section>
+          <section class="form-section">
+            <h3>Panic</h3>
+            <div class="form-grid">
+              <label class="field">Panic type<input name="panic" maxlength="120"></label>
+              <label class="field span-2">Panic Behavior<textarea name="panicDescription" rows="2" maxlength="1000" placeholder="Describe the panic behavior"></textarea></label>
+            </div>
+            <p class="help-copy">Markdown formatting and <code>{{Name}}</code> status effect links are supported in the read-only view.</p>
+          </section>
+          <section class="form-section">
+            <h3>Base stats</h3>
+            <div class="form-grid stat-grid">
+              <label class="field">Level<input name="level" type="text" inputmode="numeric" maxlength="5" required value="40" placeholder="N/A or 40"></label>
+              <label class="field">Base HP<input name="hp" type="text" placeholder="N/A"></label>
+              <label class="field">HP growth<input name="hpGrowth" type="text" placeholder="N/A"></label>
+              <label class="field">Stagger thresholds<input name="stagger" type="text" placeholder="e.g. 70 / 50 / 30"></label>
+              <label class="field">Speed<input name="speed" type="text" maxlength="30" placeholder="e.g. 3–6"></label>
+              <label class="field">Defense modifier<input name="defense" type="text" maxlength="20" placeholder="e.g. +0"></label>
+              <label class="field">Slash<select name="slash"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Pierce<select name="pierce"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Blunt<select name="blunt"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+            </div>
+          </section>
+          <section class="form-section">
+            <div class="section-title-row"><h3>Skills</h3><button id="add-skill-button" class="text-button" type="button">＋ Add skill</button></div>
+            <p class="help-copy">Record skill details. Guard and Counter skills can be marked as Clashable. Effects support Markdown and <code>{{Name}}</code> status effect links.</p>
+            <div id="skill-fields" class="skill-fields"></div>
+          </section>
+          <section class="form-section">
+            <div class="section-title-row"><h3>Passives</h3><button id="add-passive-button" class="text-button" type="button">＋ Add passive</button></div>
+            <p class="help-copy">Each passive can have multiple sin requirements. Effects support Markdown and <code>{{Name}}</code> status effect links.</p>
+            <div id="passive-fields" class="passive-fields"></div>
+          </section>
+          <section class="form-section">
+            <h3>Uptie Story</h3>
+            <label class="field">Story<textarea name="uptieStory" rows="5" maxlength="10000" placeholder="Record the identity's uptie story"></textarea></label>
+            <p class="help-copy">Markdown formatting and <code>{{Name}}</code> status effect links are supported in the read-only view.</p>
+          </section>
+          <section class="form-section">
+            <div class="section-title-row voice-line-section-heading"><h3>Voicelines</h3><div class="voice-line-actions"><button id="add-voice-line-button" class="text-button" type="button">＋ Add voiceline</button><button id="add-custom-voice-category-button" class="text-button" type="button">＋ Add unique category</button></div></div>
+            <p class="help-copy">Add lines from the standard categories or create identity-specific categories. Markdown and <code>{{Name}}</code> status effect links are supported.</p>
+            <div id="voice-line-fields" class="voice-line-fields"></div>
+          </section>
+          <section class="form-section">
+            <h3>Archive notes</h3>
+            <label class="field">Tags<input name="tags" maxlength="500" placeholder="Comma-separated, e.g. Rupture, Blade Lineage"></label>
+            <label class="field notes-field">Notes<textarea name="notes" rows="3" maxlength="2000" placeholder="Anything you want to remember about this identity…"></textarea></label>
+            <p class="help-copy">Markdown formatting and <code>{{Name}}</code> status effect links are supported in the read-only view.</p>
+          </section>
+        </div>
+        <div class="dialog-actions">
+          <button id="cancel-dialog" class="button button-quiet" type="button">Cancel</button>
+          <button class="button button-primary" type="submit">Save identity</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="announcer-dialog" class="identity-dialog">
+      <form id="announcer-form" method="dialog">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">BATTLE ANNOUNCER</p><h2 id="announcer-dialog-title">Add announcer</h2></div>
+          <button id="close-announcer-dialog" class="icon-button" type="button" aria-label="Close announcer form">×</button>
+        </div>
+        <div class="form-scroll">
+          <section class="form-section">
+            <h3>General information</h3>
+            <div class="form-grid">
+              <label class="field span-2">Announcer name <span class="required">*</span><input name="name" required maxlength="140" placeholder="e.g. Dante"></label>
+              <label class="field">Character<select name="character"><option value="">Not linked</option></select></label>
+              <label class="field">Source / bundle<input name="source" maxlength="140" placeholder="Optional"></label>
+              <label class="field span-2">Notes<textarea name="notes" rows="3" maxlength="3000" placeholder="Optional announcer notes"></textarea></label>
+            </div>
+            <p class="help-copy">Markdown formatting and <code>{{Name}}</code> status effect links are supported in the read-only view.</p>
+          </section>
+          <section class="form-section">
+            <div class="section-title-row voice-line-section-heading"><h3>Voicelines</h3><div class="voice-line-actions"><button id="add-announcer-voice-line" class="text-button" type="button">＋ Add voiceline</button></div></div>
+            <p class="help-copy">Choose from the battle occasion categories used for Limbus Company announcers. Add multiple lines to any occasion. Markdown and <code>{{Name}}</code> status effect links are supported.</p>
+            <div id="announcer-voice-line-fields" class="voice-line-fields"></div>
+          </section>
+        </div>
+        <div class="dialog-actions"><button id="cancel-announcer-dialog" class="button button-quiet" type="button">Cancel</button><button class="button button-primary" type="submit">Save announcer</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="status-effect-dialog" class="identity-dialog">
+      <form id="status-effect-form" method="dialog">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">STATUS EFFECT RECORD</p><h2 id="status-effect-dialog-title">Add status effect</h2></div>
+          <button id="close-status-effect-dialog" class="icon-button" type="button" aria-label="Close status effect form">×</button>
+        </div>
+        <div class="form-scroll">
+          <section class="form-section">
+            <h3>General information</h3>
+            <div class="form-grid">
+              <label class="field span-2">Name <span class="required">*</span><input name="name" required maxlength="120" placeholder="e.g. Burn"></label>
+              <label class="field span-2">Identifier <span class="required">*</span><input name="identifier" required maxlength="120" placeholder="e.g. burn"></label>
+              <p class="help-copy span-2">Names and identifiers must be unique. References match either value without regard to capitalization.</p>
+            </div>
+          </section>
+          <section class="form-section">
+            <h3>Effect</h3>
+            <label class="field">Description<textarea name="description" rows="5" maxlength="8000" placeholder="Describe what this status effect does"></textarea></label>
+            <p class="help-copy">Markdown formatting and <code>{{Name}}</code> status effect links are supported in the read-only view.</p>
+          </section>
+          <section class="form-section">
+            <h3>Notes</h3>
+            <label class="field">Notes<textarea name="notes" rows="3" maxlength="4000"></textarea></label>
+            <p class="help-copy">Markdown formatting and <code>{{Name}}</code> status effect links are supported in the read-only view.</p>
+          </section>
+        </div>
+        <div class="dialog-actions"><button id="cancel-status-effect-dialog" class="button button-quiet" type="button">Cancel</button><button class="button button-primary" type="submit">Save status effect</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="ego-dialog" class="identity-dialog">
+      <form id="ego-form" method="dialog">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">E.G.O RECORD</p><h2 id="ego-dialog-title">Add E.G.O</h2></div>
+          <button id="close-ego-dialog" class="icon-button" type="button" aria-label="Close E.G.O form">×</button>
+        </div>
+        <div class="form-scroll">
+          <section class="form-section">
+            <h3>General information</h3>
+            <div class="form-grid">
+              <label class="field span-2">E.G.O name <span class="required">*</span><input name="name" required maxlength="140" placeholder="e.g. Dimension Shredder"></label>
+              <label class="field">Character <span class="required">*</span><select name="character" required><option value="">Select a character</option></select></label>
+              <label class="field">Risk level<select name="riskLevel" required><option value="">Select level</option><option value="N/A">N/A</option><option>ZAYIN</option><option>TETH</option><option>HE</option><option>WAW</option><option>ALEPH</option></select></label>
+              <label class="field">Sin affinity<select name="sinAffinity" required><option value="">Select affinity</option><option value="N/A">N/A</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
+              <label class="field">Source abnormality<input name="sourceAbnormality" maxlength="140" placeholder="Optional"></label>
+              <label class="field">Release date<input name="releaseDate" type="text" placeholder="N/A or YYYY-MM-DD"></label>
+              <label class="field span-2">Acquisition<input name="acquisition" maxlength="180" placeholder="e.g. Extraction, Battle Pass, event"></label>
+              <label class="ego-base-control"><input name="baseEgo" type="checkbox"> Base / personal E.G.O</label>
+            </div>
+            <p class="help-copy">Create and edit character profiles in the Character Manager.</p>
+          </section>
+          <section class="form-section">
+            <h3>Resource costs</h3>
+            <div class="form-grid">
+              <label class="field">Awakening SP cost<input name="awakeningSanityCost" type="text" inputmode="numeric" placeholder="N/A"></label>
+              <label class="field">Corrosion SP cost<input name="corrosionSanityCost" type="text" inputmode="numeric" placeholder="N/A"></label>
+            </div>
+            <h4 class="subsection-heading">E.G.O resources required</h4>
+            <div class="form-grid stat-grid ego-data-grid">
+              <label class="field">Wrath<input data-resource-cost="Wrath" type="text" inputmode="numeric" placeholder="N/A"></label>
+              <label class="field">Lust<input data-resource-cost="Lust" type="text" inputmode="numeric" placeholder="N/A"></label>
+              <label class="field">Sloth<input data-resource-cost="Sloth" type="text" inputmode="numeric" placeholder="N/A"></label>
+              <label class="field">Gluttony<input data-resource-cost="Gluttony" type="text" inputmode="numeric" placeholder="N/A"></label>
+              <label class="field">Gloom<input data-resource-cost="Gloom" type="text" inputmode="numeric" placeholder="N/A"></label>
+              <label class="field">Pride<input data-resource-cost="Pride" type="text" inputmode="numeric" placeholder="N/A"></label>
+              <label class="field">Envy<input data-resource-cost="Envy" type="text" inputmode="numeric" placeholder="N/A"></label>
+              <label class="field">Angst<input data-resource-cost="Angst" type="text" inputmode="numeric" placeholder="N/A"></label>
+              <label class="field">Madness<input data-resource-cost="Madness" type="text" inputmode="numeric" placeholder="N/A"></label>
+            </div>
+          </section>
+          <section class="form-section">
+            <h3>Sin resistances</h3>
+            <div class="form-grid stat-grid ego-data-grid">
+              <label class="field">Wrath<select data-resistance="Wrath"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Lust<select data-resistance="Lust"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Sloth<select data-resistance="Sloth"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Gluttony<select data-resistance="Gluttony"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Gloom<select data-resistance="Gloom"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Pride<select data-resistance="Pride"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Envy<select data-resistance="Envy"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Angst<select data-resistance="Angst"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+              <label class="field">Madness<select data-resistance="Madness"><option value="">Not set</option><option value="N/A">N/A</option><option value="Fatal">Fatal (x1.5, x2]</option><option value="Weak">Weak (x1, x1.5]</option><option value="Normal">Normal [x1]</option><option value="Endure">Endure [x0.75, x1)</option><option value="Ineff.">Ineff. (x0, x0.75)</option><option value="Immune">Immune [x0]</option></select></label>
+            </div>
+          </section>
+          <section class="form-section">
+            <h3>Quotes</h3>
+            <div class="form-grid">
+              <label class="field">Awakening quote<textarea name="awakeningQuote" rows="3" maxlength="1500"></textarea></label>
+              <label class="field">Corrosion quote<textarea name="corrosionQuote" rows="3" maxlength="1500"></textarea></label>
+            </div>
+            <p class="help-copy">Markdown formatting and <code>{{Name}}</code> status effect links are supported in the read-only view.</p>
+          </section>
+          <section class="form-section">
+            <div class="section-title-row"><h3>Skills by Threadspin</h3><div class="voice-line-actions"><button id="add-ego-awakening-skill" class="text-button" type="button">＋ Awakening tier</button><button id="add-ego-corrosion-skill" class="text-button" type="button">＋ Corrosion tier</button></div></div>
+            <p class="help-copy">Add a row for each Awakening or Corrosion skill version that changes by Threadspin tier. Effects support Markdown and <code>{{Name}}</code> status effect links.</p>
+            <div id="ego-skill-fields" class="ego-skill-fields"></div>
+          </section>
+          <section class="form-section">
+            <h3>E.G.O Passive</h3>
+            <div class="form-grid">
+              <label class="field">Passive name<input name="passiveName" maxlength="120"></label>
+              <label class="field">Unlocked at Threadspin<select name="passiveThreadspin"><option value="">Not set</option><option value="N/A">N/A</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+              <label class="field span-2">Activation requirement<input name="passiveRequirement" maxlength="300" placeholder="Optional"></label>
+              <label class="field span-2">Effect<textarea name="passiveEffect" rows="3" maxlength="3000"></textarea></label>
+            </div>
+            <p class="help-copy">Markdown formatting and <code>{{Name}}</code> status effect links are supported in the read-only view.</p>
+          </section>
+          <section class="form-section">
+            <h3>Archive notes</h3>
+            <label class="field">Notes<textarea name="notes" rows="3" maxlength="3000"></textarea></label>
+            <p class="help-copy">Markdown formatting and <code>{{Name}}</code> status effect links are supported in the read-only view.</p>
+          </section>
+        </div>
+        <div class="dialog-actions"><button id="cancel-ego-dialog" class="button button-quiet" type="button">Cancel</button><button class="button button-primary" type="submit">Save E.G.O</button></div>
+      </form>
+    </dialog>
+
+    <div id="status-effect-tooltip" class="status-effect-tooltip" role="tooltip" hidden></div>
+
+    <template id="ego-skill-row-template">
+      <fieldset class="ego-skill-row">
+        <legend class="ego-skill-legend">E.G.O Skill</legend>
+        <button class="remove-ego-skill" type="button" aria-label="Remove E.G.O skill tier">×</button>
+        <div class="form-grid ego-skill-grid">
+          <label class="field">Variant<select data-key="mode"><option value="N/A">N/A</option><option>Awakening</option><option>Corrosion</option></select></label>
+          <label class="field">Threadspin<select data-key="threadspin"><option value="N/A">N/A</option><option>4</option><option>3</option><option>2</option><option>1</option></select></label>
+          <label class="field span-2">Skill name<input data-key="name" maxlength="120"></label>
+          <label class="field">Sin affinity<select data-key="sinAffinity"><option value="">Not set</option><option value="N/A">N/A</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
+          <label class="field">Attack type<select data-key="attackType"><option value="">Not set</option><option value="N/A">N/A</option><option>Slash</option><option>Pierce</option><option>Blunt</option></select></label>
+          <label class="field">Base power<input data-key="basePower" maxlength="20" placeholder="e.g. 20"></label>
+          <label class="field">Coin power<input data-key="coinPower" maxlength="20" placeholder="e.g. + 18"></label>
+          <label class="field">Coins<input data-key="coinCount" type="text" inputmode="numeric" placeholder="N/A"></label>
+          <label class="field">Attack weight<input data-key="attackWeight" type="text" inputmode="numeric" placeholder="N/A"></label>
+          <label class="field">Offense modifier<input data-key="offenseModifier" maxlength="20" placeholder="e.g. +5"></label>
+          <label class="field span-2">Skill effects<textarea data-key="effect" rows="5" maxlength="8000" placeholder="Include skill and coin effects here"></textarea></label>
+        </div>
+      </fieldset>
+    </template>
+    <template id="skill-row-template">
+      <fieldset class="skill-row">
+        <legend class="skill-row-legend">Skill</legend>
+        <button class="remove-skill" type="button" aria-label="Remove skill">×</button>
+        <label>Skill name<input data-key="name" maxlength="100" placeholder="Skill name"></label>
+        <label>Sin<select data-key="sin"><option value="">Not set</option><option value="N/A">N/A</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option><option>Sinless</option></select></label>
+        <label>Type<select data-key="type"><option value="">Not set</option><option value="N/A">N/A</option><option>Slash</option><option>Pierce</option><option>Blunt</option><option>Guard</option><option>Evade</option><option>Counter</option></select></label>
+        <label>Skill power<input data-key="skillPower" maxlength="20" placeholder="e.g. 4"></label>
+        <label>Coin power<input data-key="coinPower" maxlength="20" placeholder="e.g. + 3"></label>
+        <label>Coins<input data-key="coins" type="text" inputmode="numeric" maxlength="4" placeholder="N/A"></label>
+        <div class="skill-advanced">
+          <label>Skill level / subskill<input data-key="skillLevel" type="text" maxlength="12" placeholder="e.g. 1 or 1-2"></label>
+          <label>Amount<input data-key="amount" type="text" inputmode="numeric" placeholder="N/A"></label>
+          <label>Attack weight<input data-key="attackWeight" type="text" inputmode="numeric" placeholder="N/A"></label>
+          <label>Power modifier<input data-key="powerModifier" maxlength="20" placeholder="e.g. +5"></label>
+        </div>
+        <label class="clashable-control" hidden><input data-key="clashable" type="checkbox"> Clashable</label>
+        <label class="skill-effect">Effect<textarea data-key="effect" rows="2" maxlength="2000" placeholder="Optional effect text"></textarea></label>
+      </fieldset>
+    </template>
+    <template id="passive-row-template">
+      <fieldset class="passive-row">
+        <legend class="passive-row-legend">Passive</legend>
+        <button class="remove-passive" type="button" aria-label="Remove passive">×</button>
+        <label>Name<input data-key="name" maxlength="100" placeholder="Passive name"></label>
+        <div class="passive-requirements"></div>
+        <button class="add-passive-requirement text-button" type="button">＋ Add sin requirement</button>
+        <label class="passive-effect">Effect<textarea data-key="effect" rows="2" maxlength="2000"></textarea></label>
+      </fieldset>
+    </template>
+    <template id="passive-requirement-template">
+      <div class="passive-requirement-row">
+        <label>Sin type<select data-requirement-key="sinType"><option value="">Not set</option><option value="N/A">N/A</option><option>Wrath</option><option>Lust</option><option>Sloth</option><option>Gluttony</option><option>Gloom</option><option>Pride</option><option>Envy</option><option>Angst</option><option>Madness</option></select></label>
+        <label>Amount<input data-requirement-key="sinAmount" type="text" inputmode="numeric" placeholder="N/A"></label>
+        <label>Owned / Resonance<select data-requirement-key="sinMode"><option value="">Not set</option><option value="N/A">N/A</option><option>Owned</option><option>Resonance</option></select></label>
+        <button class="remove-passive-requirement" type="button" aria-label="Remove sin requirement">×</button>
+      </div>
+    </template>
+    <template id="voice-line-row-template">
+      <fieldset class="voice-line-row">
+        <legend>Voiceline</legend>
+        <label class="voice-line-category">Category<select data-key="category"><option value="">Select a category</option><option value="__custom_category__">＋ Create unique category…</option></select></label>
+        <button class="remove-voice-line" type="button" aria-label="Remove voiceline">×</button>
+        <label class="voice-line-custom-category" hidden>Unique category name<input data-custom-category maxlength="100" placeholder="e.g. Announcer line"></label>
+        <label class="voice-line-text">Voiceline text<textarea data-key="text" rows="3" maxlength="4000" placeholder="Enter voiceline text"></textarea></label>
+      </fieldset>
+    </template>
+    <template id="announcer-voice-line-row-template">
+      <fieldset class="voice-line-row announcer-voice-line-row">
+        <legend>Announcer voiceline</legend>
+        <label class="voice-line-category">Occasion<select data-key="category" required><option value="">Select an occasion</option></select></label>
+        <button class="remove-voice-line" type="button" aria-label="Remove announcer voiceline">×</button>
+        <label class="voice-line-text">Voiceline text<textarea data-key="text" rows="3" maxlength="4000" placeholder="Enter voiceline text"></textarea></label>
+      </fieldset>
+    </template>
+  </body>
+</html>
